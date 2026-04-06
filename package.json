@@ -1,0 +1,19 @@
+{
+  "name": "feedly-music",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file=.env --import tsx scripts/cli.ts",
+    "scrape": "claude -p '/feedly-music'"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0"
+  }
+}
