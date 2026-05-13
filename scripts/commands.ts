@@ -23,12 +23,17 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUTPUT_PATH = join(__dirname, '..', 'output.html')
 
-/** 등록된 RSS 피드를 모두 fetch하고, DB에 없는 새 기사만 저장한 뒤 unread 기사를 JSON으로 stdout에 출력한다. */
+/** 기존 unread 기사를 모두 read로 마킹한 뒤, 등록된 RSS 피드를 fetch하고 새 기사만 저장하여 unread로 출력한다. */
 export async function scrape(): Promise<void> {
   const feeds = listFeeds()
   if (feeds.length === 0) {
     console.error('No feeds registered. Run `pnpm start --import-opml <path>` or `pnpm start --add-feed <url>`.')
     process.exit(1)
+  }
+
+  const prevUnread = dbMarkAllRead()
+  if (prevUnread > 0) {
+    console.error(`Marked ${prevUnread} previously unread articles as read.`)
   }
 
   console.error(`Fetching ${feeds.length} feeds...`)
