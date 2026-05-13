@@ -47,7 +47,7 @@ export function generateHtml(tracks: TrackWithVideo[]): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Feedly Music</title>
+<title>RSS Music</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: #0f0f0f; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 2rem; }
@@ -67,7 +67,7 @@ export function generateHtml(tracks: TrackWithVideo[]): string {
 </style>
 </head>
 <body>
-  <h1>Feedly Music – musicexplo</h1>
+  <h1>RSS Music</h1>
   <p class="stats">${grouped.size} articles / ${tracks.length} tracks / ${matched} matched</p>
   ${cards}
 </body>

@@ -3,47 +3,87 @@ import { createServer } from 'http'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import type { TrackInput, TrackWithVideo } from './types.js'
-import { fetchUnreadEntries, markAsRead } from './feedly.js'
+import { fetchFeeds } from './rss.js'
+import { parseOpml } from './opml.js'
 import { searchYouTube } from './youtube.js'
 import { generateHtml } from './html.js'
-import { hasArticle, saveArticles, getCachedVideos, cacheVideo, markAllProcessed } from './db.js'
+import {
+  hasArticle,
+  saveArticles,
+  getCachedVideos,
+  cacheVideo,
+  markAllRead as dbMarkAllRead,
+  listFeeds,
+  upsertFeed,
+  removeFeed,
+  touchFeed,
+  getUnreadArticles,
+} from './db.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUTPUT_PATH = join(__dirname, '..', 'output.html')
 
-/** Feedly에서 안 읽은 기사를 가져와 새 기사만 JSON으로 stdout에 출력하고, DB에 저장 후 읽음 처리한다. */
+/** 등록된 RSS 피드를 모두 fetch하고, DB에 없는 새 기사만 저장한 뒤 unread 기사를 JSON으로 stdout에 출력한다. */
 export async function scrape(): Promise<void> {
-  const entries = await fetchUnreadEntries()
+  const feeds = listFeeds()
+  if (feeds.length === 0) {
+    console.error('No feeds registered. Run `pnpm start --import-opml <path>` or `pnpm start --add-feed <url>`.')
+    process.exit(1)
+  }
 
-  const newEntries = entries.filter((e) => !hasArticle(e.id))
+  console.error(`Fetching ${feeds.length} feeds...`)
+  const results = await fetchFeeds(feeds.map((f) => f.url))
+
+  let newCount = 0
+  let errorCount = 0
+  for (const result of results) {
+    if (result.error) {
+      console.error(`  ✗ ${result.feedUrl}: ${result.error}`)
+      errorCount++
+      continue
+    }
+    if (result.feedTitle) {
+      upsertFeed(result.feedUrl, result.feedTitle)
+    }
+    touchFeed(result.feedUrl)
+
+    const fresh = result.items.filter((i) => !hasArticle(i.id))
+    if (fresh.length > 0) {
+      saveArticles(
+        fresh.map((i) => ({
+          id: i.id,
+          feedUrl: i.feedUrl,
+          title: i.title,
+          source: i.feedTitle,
+          url: i.url,
+          summary: i.summary,
+          image: i.image,
+          published: i.published,
+          read: 0,
+        })),
+      )
+      newCount += fresh.length
+    }
+  }
+
+  const unread = getUnreadArticles()
   console.error(
-    `Feedly: ${entries.length} unread, ${newEntries.length} new, ${entries.length - newEntries.length} cached`,
+    `RSS: ${results.length} feeds (${errorCount} errors), ${newCount} new articles, ${unread.length} unread total`,
   )
 
-  const mapped = newEntries.map((e) => ({
-    id: e.id,
-    title: e.title ?? '',
-    source: e.origin?.title ?? '',
-    url: e.alternate?.[0]?.href ?? '',
-    keywords: e.keywords ? JSON.stringify(e.keywords) : null,
-    summary: e.summary?.content ?? null,
-    image: e.visual?.url ?? null,
-    published: e.published ? new Date(e.published).toISOString() : null,
-    processed: 0,
-  }))
-
-  saveArticles(mapped)
-
   const result = {
-    category: 'musicexplo',
-    entries: mapped,
+    entries: unread.map((a) => ({
+      id: a.id,
+      title: a.title,
+      source: a.source,
+      url: a.url,
+      summary: a.summary,
+      image: a.image,
+      published: a.published,
+    })),
   }
 
   console.log(JSON.stringify(result, null, 2))
-
-  await markAsRead(entries.map((e) => e.id))
-
-  console.error(`Marked ${entries.length} entries as read.`)
 }
 
 interface SearchOptions {
@@ -109,16 +149,64 @@ export async function searchAndOutput(
     res.end(html)
   })
 
-  server.listen(3000, () => {
-    console.error('Serving at http://localhost:3000')
+  server.listen(3333, () => {
+    console.error('Serving at http://localhost:3333')
     import('child_process').then(({ exec }) =>
-      exec('open http://localhost:3000'),
+      exec('open http://localhost:3333'),
     )
   })
 }
 
-/** 미처리 기사를 모두 처리 완료로 마킹한다. */
+/** 모든 unread 기사를 read로 마킹한다. */
 export function markAllRead(): void {
-  const count = markAllProcessed()
-  console.log(`Marked ${count} articles as processed.`)
+  const count = dbMarkAllRead()
+  console.log(`Marked ${count} articles as read.`)
+}
+
+/** OPML 파일을 파싱하여 피드를 DB에 등록한다. --category 필터로 특정 카테고리만 선택 가능. */
+export function importOpml(filePath: string, category: string | null): void {
+  const feeds = parseOpml(filePath)
+  const filtered = category
+    ? feeds.filter((f) => f.category?.toLowerCase() === category.toLowerCase())
+    : feeds
+
+  if (filtered.length === 0) {
+    console.error(
+      category
+        ? `No feeds found in category "${category}". Available categories: ${[...new Set(feeds.map((f) => f.category).filter(Boolean))].join(', ')}`
+        : 'No feeds found in OPML file.',
+    )
+    process.exit(1)
+  }
+
+  for (const feed of filtered) {
+    upsertFeed(feed.url, feed.title)
+  }
+  console.log(`Imported ${filtered.length} feeds${category ? ` from category "${category}"` : ''}.`)
+}
+
+export function addFeed(url: string): void {
+  upsertFeed(url, null)
+  console.log(`Added feed: ${url}`)
+}
+
+export function removeFeedCmd(url: string): void {
+  const changes = removeFeed(url)
+  if (changes === 0) {
+    console.error(`Feed not found: ${url}`)
+    process.exit(1)
+  }
+  console.log(`Removed feed: ${url}`)
+}
+
+export function listFeedsCmd(): void {
+  const feeds = listFeeds()
+  if (feeds.length === 0) {
+    console.log('No feeds registered.')
+    return
+  }
+  for (const f of feeds) {
+    console.log(`${f.title ?? '(no title)'}\n  ${f.url}\n  last fetched: ${f.lastFetchedAt ?? 'never'}`)
+  }
+  console.log(`\nTotal: ${feeds.length} feeds`)
 }

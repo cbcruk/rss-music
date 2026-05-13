@@ -1,12 +1,12 @@
-export interface FeedlyEntry {
+export interface RssItem {
   id: string
+  feedUrl: string
+  feedTitle: string
   title: string
-  origin?: { title: string }
-  alternate?: { href: string }[]
-  keywords?: string[]
-  summary?: { content: string }
-  visual?: { url: string }
-  published?: number
+  url: string
+  summary: string | null
+  image: string | null
+  published: string | null
 }
 
 export interface TrackInput {
@@ -20,4 +20,10 @@ export interface TrackInput {
 export interface TrackWithVideo extends TrackInput {
   videoId: string | null
   videoTitle: string | null
+}
+
+export interface OpmlFeed {
+  url: string
+  title: string | null
+  category: string | null
 }
