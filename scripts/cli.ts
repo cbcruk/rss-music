@@ -1,6 +1,5 @@
 import {
   scrape,
-  searchAndOutput,
   markAllRead,
   importOpml,
   addFeed,
@@ -23,12 +22,6 @@ const opmlPath = flagValue('--import-opml')
 const addFeedUrl = flagValue('--add-feed')
 const removeFeedUrl = flagValue('--remove-feed')
 const category = flagValue('--category') ?? null
-const jsonArg = args.find((a, i) => {
-  if (a.startsWith('--')) return false
-  const prev = args[i - 1]
-  if (prev === '--import-opml' || prev === '--add-feed' || prev === '--remove-feed' || prev === '--category') return false
-  return true
-})
 
 if (opmlPath) {
   importOpml(opmlPath, category)
@@ -40,8 +33,6 @@ if (opmlPath) {
   listFeedsCmd()
 } else if (markReadFlag) {
   markAllRead()
-} else if (!jsonArg) {
-  scrape()
 } else {
-  searchAndOutput(jsonArg, { useApi: !noApi })
+  scrape({ useApi: !noApi })
 }

@@ -2,9 +2,10 @@ import { writeFileSync } from 'fs'
 import { createServer } from 'http'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import type { TrackInput, TrackWithVideo } from './types.js'
+import type { TrackWithVideo } from './types.js'
 import { fetchFeeds } from './rss.js'
 import { parseOpml } from './opml.js'
+import { generateTracks } from './gemini.js'
 import { searchYouTube } from './youtube.js'
 import { generateHtml } from './html.js'
 import {
@@ -24,20 +25,32 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUTPUT_PATH = join(__dirname, '..', 'output.html')
 
-/** 등록된 RSS 피드를 fetch하여 새 기사만 read=0으로 저장한 뒤, 현재 unread 기사 전체를 JSON으로 stdout에 출력한다. read 마킹은 searchAndOutput이 HTML을 성공적으로 생성한 후에만 일어난다. */
-export async function scrape(): Promise<void> {
+interface ScrapeOptions {
+  useApi: boolean
+}
+
+/** RSS fetch → Gemini로 검색어 생성 → YouTube 검색 → HTML 생성 → localhost:3333 서빙 → 성공 시 read 마킹.
+ * 단일 Node 프로세스에서 모든 단계가 수행되며, HTML 생성 전에 어디서 실패해도 unread 상태로 남아 다음 실행에 자동 재처리된다. */
+export async function scrape(options: ScrapeOptions): Promise<void> {
   const feeds = listFeeds()
   if (feeds.length === 0) {
-    console.error('No feeds registered. Run `pnpm start --import-opml <path>` or `pnpm start --add-feed <url>`.')
+    console.error(
+      'No feeds registered. Run `pnpm start --import-opml <path>` or `pnpm start --add-feed <url>`.',
+    )
     process.exit(1)
   }
 
+  const cleared = dbMarkAllRead()
+  if (cleared > 0) {
+    console.error(`Cleared ${cleared} backlog articles (read=0 → 1).`)
+  }
+
   console.error(`Fetching ${feeds.length} feeds...`)
-  const results = await fetchFeeds(feeds.map((f) => f.url))
+  const fetchResults = await fetchFeeds(feeds.map((f) => f.url))
 
   let newCount = 0
   let errorCount = 0
-  for (const result of results) {
+  for (const result of fetchResults) {
     if (result.error) {
       console.error(`  ✗ ${result.feedUrl}: ${result.error}`)
       errorCount++
@@ -67,73 +80,61 @@ export async function scrape(): Promise<void> {
     }
   }
 
-  const unread = getUnreadArticles()
   console.error(
-    `RSS: ${results.length} feeds (${errorCount} errors), ${newCount} new articles, ${unread.length} unread total`,
+    `RSS: ${fetchResults.length} feeds (${errorCount} errors), ${newCount} new articles`,
   )
 
-  const result = {
-    entries: unread.map((a) => ({
-      id: a.id,
-      title: a.title,
-      source: a.source,
-      url: a.url,
-      summary: a.summary,
-      image: a.image,
-      published: a.published,
-    })),
+  const unread = getUnreadArticles()
+  if (unread.length === 0) {
+    console.error('No unread articles to process.')
+    return
   }
+  console.error(`Unread to process: ${unread.length}`)
 
-  console.log(JSON.stringify(result, null, 2))
-}
+  const tracks = await generateTracks(unread)
+  console.error(`Gemini: produced ${tracks.length} tracks from ${unread.length} articles.`)
 
-interface SearchOptions {
-  useApi: boolean
-}
-
-/** 트랙 JSON 배열을 받아 YouTube 검색(캐시 우선) 후 HTML을 생성하고 localhost:3000에서 서빙한다. --no-api 시 검색 링크만 제공. */
-export async function searchAndOutput(
-  tracksJson: string,
-  options: SearchOptions,
-): Promise<void> {
-  const tracks: TrackInput[] = JSON.parse(tracksJson)
-  const results: TrackWithVideo[] = []
+  const trackResults: TrackWithVideo[] = []
   let cacheHits = 0
 
   for (const track of tracks) {
     if (!track.searchQuery) {
-      console.error(`Skipped: ${track.articleTitle}`)
-      results.push({ ...track, videoId: null, videoTitle: null })
+      trackResults.push({ ...track, videoId: null, videoTitle: null })
       continue
     }
 
     if (!options.useApi) {
-      results.push({ ...track, videoId: null, videoTitle: null })
+      trackResults.push({ ...track, videoId: null, videoTitle: null })
       continue
     }
 
-    const cached = getCachedVideos(track.articleId)
-    const cachedHit = cached.find((c) => c.searchQuery === track.searchQuery)
-    if (cachedHit) {
-      console.error(`Cache hit: ${track.searchQuery}`)
-      results.push({
+    const cached = getCachedVideos(track.articleId).find(
+      (c) => c.searchQuery === track.searchQuery,
+    )
+    if (cached) {
+      trackResults.push({
         ...track,
-        videoId: cachedHit.videoId,
-        videoTitle: cachedHit.videoTitle,
+        videoId: cached.videoId,
+        videoTitle: cached.videoTitle,
       })
       cacheHits++
       continue
     }
 
     console.error(`Searching: ${track.searchQuery}`)
-    const video = await searchYouTube(track.searchQuery)
-    cacheVideo(
-      track.articleId,
-      track.searchQuery,
-      video.videoId,
-      video.videoTitle,
-    )
-    results.push({ ...track, ...video })
+    try {
+      const video = await searchYouTube(track.searchQuery)
+      cacheVideo(
+        track.articleId,
+        track.searchQuery,
+        video.videoId,
+        video.videoTitle,
+      )
+      trackResults.push({ ...track, ...video })
+    } catch (e) {
+      console.error(`  ✗ YouTube search failed: ${e instanceof Error ? e.message : String(e)}`)
+      trackResults.push({ ...track, videoId: null, videoTitle: null })
+    }
   }
 
   const apiCalls = options.useApi ? tracks.length - cacheHits : 0
@@ -141,7 +142,7 @@ export async function searchAndOutput(
     `YouTube: ${tracks.length} tracks, ${cacheHits} cached, ${apiCalls} API calls${!options.useApi ? ' (link-only mode)' : ''}`,
   )
 
-  const html = generateHtml(results)
+  const html = generateHtml(trackResults)
   writeFileSync(OUTPUT_PATH, html)
   console.error(`Generated: ${OUTPUT_PATH}`)
 
@@ -162,7 +163,7 @@ export async function searchAndOutput(
   })
 }
 
-/** 모든 unread 기사를 read로 마킹한다. */
+/** 모든 unread 기사를 read로 마킹한다. (긴급 클리어용) */
 export function markAllRead(): void {
   const count = dbMarkAllRead()
   console.log(`Marked ${count} articles as read.`)
@@ -187,7 +188,9 @@ export function importOpml(filePath: string, category: string | null): void {
   for (const feed of filtered) {
     upsertFeed(feed.url, feed.title)
   }
-  console.log(`Imported ${filtered.length} feeds${category ? ` from category "${category}"` : ''}.`)
+  console.log(
+    `Imported ${filtered.length} feeds${category ? ` from category "${category}"` : ''}.`,
+  )
 }
 
 export function addFeed(url: string): void {
@@ -211,7 +214,9 @@ export function listFeedsCmd(): void {
     return
   }
   for (const f of feeds) {
-    console.log(`${f.title ?? '(no title)'}\n  ${f.url}\n  last fetched: ${f.lastFetchedAt ?? 'never'}`)
+    console.log(
+      `${f.title ?? '(no title)'}\n  ${f.url}\n  last fetched: ${f.lastFetchedAt ?? 'never'}`,
+    )
   }
   console.log(`\nTotal: ${feeds.length} feeds`)
 }
