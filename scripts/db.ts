@@ -167,6 +167,15 @@ export function markRead(id: string): void {
   db.prepare('UPDATE articles SET read = 1 WHERE id = ?').run(id)
 }
 
+export function markArticlesRead(ids: string[]): number {
+  if (ids.length === 0) return 0
+  const placeholders = ids.map(() => '?').join(',')
+  const result = db
+    .prepare(`UPDATE articles SET read = 1 WHERE id IN (${placeholders})`)
+    .run(...ids)
+  return result.changes
+}
+
 export function markAllRead(): number {
   const result = db.prepare('UPDATE articles SET read = 1 WHERE read = 0').run()
   return result.changes

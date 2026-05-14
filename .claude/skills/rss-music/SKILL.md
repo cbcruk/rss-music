@@ -36,7 +36,7 @@ Bash 도구로 실행:
 cd /Users/ieunsu/Documents/GitHub/rss-extensions && pnpm start
 ```
 
-인자 없이 실행하면 기존 unread 기사를 모두 read로 처리한 뒤, 등록된 RSS 피드를 fetch하여 DB에 없는 새 기사만 저장하고 unread(=이번 실행에서 새로 들어온 것)를 JSON으로 stdout에 출력합니다.
+인자 없이 실행하면 등록된 RSS 피드를 fetch하여 DB에 없는 새 기사만 read=0으로 저장하고, 현재 처리되지 않은 unread 기사 전체를 JSON으로 stdout에 출력합니다. (read 마킹은 Step 3에서 HTML이 정상 생성된 후에만 일어나므로 중간에 실패해도 같은 기사가 다음 실행에서 다시 나옵니다.)
 
 ## Step 2: Build Search Queries
 
@@ -72,6 +72,6 @@ cd /Users/ieunsu/Documents/GitHub/rss-extensions && pnpm start '<JSON 배열>'
 이 명령이 각 검색어로 YouTube 영상을 검색하고, localhost:3333에서 결과 페이지를 자동으로 엽니다.
 타임아웃을 120초 이상으로 설정하세요. 서버는 프로세스가 종료될 때까지 유지됩니다.
 
-read 마킹은 다음 Step 1 실행 시 자동으로 처리되므로 별도 명령이 필요 없습니다.
+HTML이 성공적으로 생성된 시점에 입력 JSON에 포함된 articleId들이 자동으로 read=1로 마킹됩니다. 따라서 중간에 실패하면 같은 기사가 다음 Step 1 실행에서 다시 출력됩니다.
 
 완료 후 결과를 간단히 요약하세요 (기사 수, 트랙 수, YouTube 매칭 수).

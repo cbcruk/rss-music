@@ -13,6 +13,7 @@ import {
   getCachedVideos,
   cacheVideo,
   markAllRead as dbMarkAllRead,
+  markArticlesRead,
   listFeeds,
   upsertFeed,
   removeFeed,
@@ -23,17 +24,12 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const OUTPUT_PATH = join(__dirname, '..', 'output.html')
 
-/** 기존 unread 기사를 모두 read로 마킹한 뒤, 등록된 RSS 피드를 fetch하고 새 기사만 저장하여 unread로 출력한다. */
+/** 등록된 RSS 피드를 fetch하여 새 기사만 read=0으로 저장한 뒤, 현재 unread 기사 전체를 JSON으로 stdout에 출력한다. read 마킹은 searchAndOutput이 HTML을 성공적으로 생성한 후에만 일어난다. */
 export async function scrape(): Promise<void> {
   const feeds = listFeeds()
   if (feeds.length === 0) {
     console.error('No feeds registered. Run `pnpm start --import-opml <path>` or `pnpm start --add-feed <url>`.')
     process.exit(1)
-  }
-
-  const prevUnread = dbMarkAllRead()
-  if (prevUnread > 0) {
-    console.error(`Marked ${prevUnread} previously unread articles as read.`)
   }
 
   console.error(`Fetching ${feeds.length} feeds...`)
@@ -148,6 +144,10 @@ export async function searchAndOutput(
   const html = generateHtml(results)
   writeFileSync(OUTPUT_PATH, html)
   console.error(`Generated: ${OUTPUT_PATH}`)
+
+  const articleIds = [...new Set(tracks.map((t) => t.articleId))]
+  const marked = markArticlesRead(articleIds)
+  console.error(`Marked ${marked} articles as read.`)
 
   const server = createServer((_, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })

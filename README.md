@@ -58,10 +58,10 @@ pnpm start --add-feed https://example.com/feed.xml
 
 | 명령어 | 설명 |
 |---|---|
-| `pnpm start` | 기존 unread를 read 처리 후, 등록 피드를 fetch하여 새 기사만 JSON으로 출력 |
-| `pnpm start '<JSON>'` | YouTube 검색 + HTML 생성 + localhost:3333 서빙 |
+| `pnpm start` | 등록 피드를 fetch하여 새 기사를 저장하고, 현재 unread 기사 전체를 JSON으로 출력 |
+| `pnpm start '<JSON>'` | YouTube 검색 + HTML 생성 + localhost:3333 서빙. HTML 생성 성공 시 입력 article만 read로 마킹 |
 | `pnpm start '<JSON>' --no-api` | YouTube API 없이 검색 링크만 제공 |
-| `pnpm start --mark-read` | 모든 unread 기사를 read로 마킹 (필요 시 수동) |
+| `pnpm start --mark-read` | 모든 unread 기사를 read로 마킹 (긴급 수동 클리어용) |
 | `pnpm start --import-opml <path> [--category <name>]` | OPML 파일에서 피드 import |
 | `pnpm start --add-feed <url>` | 피드 추가 |
 | `pnpm start --remove-feed <url>` | 피드 제거 |
@@ -71,12 +71,14 @@ pnpm start --add-feed https://example.com/feed.xml
 
 ## 동작 과정
 
-1. 기존 unread 기사를 모두 read로 마킹 (다음 사이클을 위한 초기화)
-2. 등록된 RSS 피드를 모두 병렬 fetch
-3. SQLite에 없는 새 기사만 read=0으로 저장 후 JSON으로 stdout 출력
+1. 등록된 RSS 피드를 모두 병렬 fetch
+2. SQLite에 없는 새 기사만 read=0으로 저장
+3. 현재 unread 기사 전체를 JSON으로 stdout 출력 (이 시점엔 read 변경 없음)
 4. Claude가 기사 제목을 분석하여 YouTube 검색어 생성
 5. YouTube Data API로 영상 검색 (캐시 우선)
-6. 결과를 HTML로 생성하여 localhost:3333에서 확인
+6. HTML 생성 후 localhost:3333에서 확인 — **이 시점에 입력 article들만 read=1로 마킹**
+
+→ 4-6단계 중 어디서 실패해도 해당 기사는 unread로 남아 다음 실행에서 자동 재처리됨.
 
 ---
 
