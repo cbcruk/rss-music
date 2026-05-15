@@ -1,6 +1,17 @@
 node_modules
 .env
-output.html
+.env.local
 data/
 .DS_Store
+
+# TanStack Start / Vite
+dist
+dist-ssr
+.nitro
+.tanstack
+.output
+.vinxi
+
+# Misc
+output.html
 tmp-queries.json

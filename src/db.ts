@@ -181,6 +181,43 @@ export function markAllRead(): number {
   return result.changes
 }
 
+export function getRecentArticles(limit = 100): ArticleRow[] {
+  const rows = db
+    .prepare(
+      `SELECT id, feed_url, title, source, url, summary, image, published, read
+       FROM articles ORDER BY COALESCE(published, created_at) DESC LIMIT ?`,
+    )
+    .all(limit) as {
+    id: string
+    feed_url: string
+    title: string
+    source: string
+    url: string
+    summary: string | null
+    image: string | null
+    published: string | null
+    read: number
+  }[]
+  return rows.map((r) => ({
+    id: r.id,
+    feedUrl: r.feed_url,
+    title: r.title,
+    source: r.source,
+    url: r.url,
+    summary: r.summary,
+    image: r.image,
+    published: r.published,
+    read: r.read,
+  }))
+}
+
+export function getUnreadCount(): number {
+  const row = db
+    .prepare('SELECT COUNT(*) as count FROM articles WHERE read = 0')
+    .get() as { count: number }
+  return row.count
+}
+
 export function getCachedVideos(articleId: string): {
   searchQuery: string
   videoId: string | null

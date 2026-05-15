@@ -3,20 +3,47 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "start": "node --env-file=.env --import tsx scripts/cli.ts",
-    "scrape": "pnpm start"
+  "imports": {
+    "#/*": "./src/*"
   },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.5.2",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2"
+  "scripts": {
+    "dev": "vite dev --port 3333",
+    "build": "vite build",
+    "start": "vite preview --port 3333"
   },
   "dependencies": {
     "@google/genai": "^2.2.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@tanstack/react-devtools": "latest",
+    "@tanstack/react-router": "latest",
+    "@tanstack/react-router-devtools": "latest",
+    "@tanstack/react-router-ssr-query": "latest",
+    "@tanstack/react-start": "latest",
+    "@tanstack/router-plugin": "^1.132.0",
     "better-sqlite3": "^12.8.0",
     "fast-xml-parser": "^5.7.3",
-    "rss-parser": "^3.13.0"
+    "lucide-react": "^0.545.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "rss-parser": "^3.13.0",
+    "tailwindcss": "^4.1.18"
+  },
+  "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
+    "@tanstack/devtools-vite": "latest",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.10.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "lightningcss",
+      "better-sqlite3"
+    ]
   }
 }

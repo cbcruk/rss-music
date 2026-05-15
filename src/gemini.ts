@@ -43,7 +43,17 @@ function formatArticles(articles: ArticleRow[]): string {
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
 const MAX_ATTEMPTS = 5
 
-async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
+export type GeminiProgressEvent =
+  | { type: 'batch-start'; current: number; total: number; size: number }
+  | { type: 'batch-retry'; label: string; attempt: number; status: number; delayMs: number }
+
+export type GeminiProgressCallback = (event: GeminiProgressEvent) => void
+
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  label: string,
+  onProgress: GeminiProgressCallback | undefined,
+): Promise<T> {
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
       return await fn()
@@ -52,9 +62,13 @@ async function withRetry<T>(fn: () => Promise<T>, label: string): Promise<T> {
       const retryable = typeof status === 'number' && RETRYABLE_STATUSES.has(status)
       if (!retryable || attempt === MAX_ATTEMPTS) throw e
       const delay = Math.min(1000 * 2 ** (attempt - 1), 16000) + Math.random() * 500
-      console.error(
-        `  ${label} attempt ${attempt} failed (${status}), retrying in ${Math.round(delay)}ms...`,
-      )
+      onProgress?.({
+        type: 'batch-retry',
+        label,
+        attempt,
+        status: status as number,
+        delayMs: Math.round(delay),
+      })
       await new Promise((r) => setTimeout(r, delay))
     }
   }
@@ -65,6 +79,7 @@ async function generateBatch(
   ai: GoogleGenAI,
   articles: ArticleRow[],
   batchLabel: string,
+  onProgress: GeminiProgressCallback | undefined,
 ): Promise<TrackInput[]> {
   const response = await withRetry(
     () =>
@@ -78,6 +93,7 @@ async function generateBatch(
         },
       }),
     batchLabel,
+    onProgress,
   )
 
   const text = response.text
@@ -87,11 +103,11 @@ async function generateBatch(
 
 export async function generateTracks(
   articles: ArticleRow[],
+  onProgress?: GeminiProgressCallback,
 ): Promise<TrackInput[]> {
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) {
-    console.error('GEMINI_API_KEY is required')
-    process.exit(1)
+    throw new Error('GEMINI_API_KEY is required')
   }
 
   const ai = new GoogleGenAI({ apiKey })
@@ -102,8 +118,13 @@ export async function generateTracks(
     const batch = articles.slice(i, i + BATCH_SIZE)
     const batchNo = Math.floor(i / BATCH_SIZE) + 1
     const label = `Gemini batch ${batchNo}/${totalBatches}`
-    console.error(`${label} (${batch.length} articles)`)
-    const batchResults = await generateBatch(ai, batch, label)
+    onProgress?.({
+      type: 'batch-start',
+      current: batchNo,
+      total: totalBatches,
+      size: batch.length,
+    })
+    const batchResults = await generateBatch(ai, batch, label, onProgress)
     tracks.push(...batchResults)
   }
 
