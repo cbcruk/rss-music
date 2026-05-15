@@ -218,6 +218,36 @@ export function getUnreadCount(): number {
   return row.count
 }
 
+export interface CachedTrack {
+  articleId: string
+  searchQuery: string
+  videoId: string | null
+  videoTitle: string | null
+}
+
+export function getTracksByArticleIds(ids: string[]): CachedTrack[] {
+  if (ids.length === 0) return []
+  const placeholders = ids.map(() => '?').join(',')
+  const rows = db
+    .prepare(
+      `SELECT article_id, search_query, video_id, video_title
+       FROM youtube_cache WHERE article_id IN (${placeholders})
+       ORDER BY article_id, search_query`,
+    )
+    .all(...ids) as {
+    article_id: string
+    search_query: string
+    video_id: string | null
+    video_title: string | null
+  }[]
+  return rows.map((r) => ({
+    articleId: r.article_id,
+    searchQuery: r.search_query,
+    videoId: r.video_id,
+    videoTitle: r.video_title,
+  }))
+}
+
 export function getCachedVideos(articleId: string): {
   searchQuery: string
   videoId: string | null
