@@ -1,7 +1,7 @@
-import { TrackCard, type Track } from "./track-card";
+import { TrackCard, type Track } from './track-card'
 
 interface TrackGridProps {
-  tracks: Track[];
+  tracks: Track[]
 }
 
 export function TrackGrid({ tracks }: TrackGridProps) {
@@ -11,5 +11,5 @@ export function TrackGrid({ tracks }: TrackGridProps) {
         <TrackCard key={`${t.searchQuery}-${i}`} track={t} />
       ))}
     </div>
-  );
+  )
 }

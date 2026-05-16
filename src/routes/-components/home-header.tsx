@@ -1,9 +1,9 @@
-import type { ComponentProps, ReactNode } from "react";
+import type { ComponentProps, ReactNode } from 'react'
 
 interface HomeHeaderProps {
-  articleCount: number;
-  unreadCount: number;
-  children: ReactNode;
+  articleCount: number
+  unreadCount: number
+  children: ReactNode
 }
 
 export function HomeHeader({ articleCount, unreadCount, children }: HomeHeaderProps) {
@@ -17,10 +17,10 @@ export function HomeHeader({ articleCount, unreadCount, children }: HomeHeaderPr
       </div>
       {children}
     </header>
-  );
+  )
 }
 
-export function HomeHeaderButton({ children, ...props }: ComponentProps<"button">) {
+export function HomeHeaderButton({ children, ...props }: ComponentProps<'button'>) {
   return (
     <button
       {...props}
@@ -28,5 +28,5 @@ export function HomeHeaderButton({ children, ...props }: ComponentProps<"button"
     >
       {children}
     </button>
-  );
+  )
 }
