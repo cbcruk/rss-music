@@ -5,13 +5,15 @@ interface CustomItemFields {
   'media:content'?: { $: { url?: string } } | { $: { url?: string } }[]
   'media:thumbnail'?: { $: { url?: string } } | { $: { url?: string } }[]
   enclosure?: { url?: string; type?: string }
+  'content:encoded'?: string
+  id?: string
 }
 
 const parser = new Parser<{}, CustomItemFields>({
   timeout: 15000,
   headers: { 'User-Agent': 'rss-extensions/1.0 (+https://github.com/)' },
   customFields: {
-    item: ['media:content', 'media:thumbnail', 'enclosure'],
+    item: ['media:content', 'media:thumbnail', 'enclosure', 'content:encoded'],
   },
 })
 
@@ -40,7 +42,7 @@ function pickImage(item: Parser.Item & CustomItemFields): string | null {
   return match ? match[1] : null
 }
 
-function pickId(item: Parser.Item, feedUrl: string): string {
+function pickId(item: Parser.Item & CustomItemFields, feedUrl: string): string {
   return item.guid || item.id || item.link || `${feedUrl}#${item.title ?? ''}`
 }
 
