@@ -1,18 +1,12 @@
-import type { ComponentProps, ReactNode } from "react"
+import type { ComponentProps, ReactNode } from "react";
 
 interface HomeHeaderProps {
-  articleCount: number
-  unreadCount: number
-  children: ReactNode
+  articleCount: number;
+  unreadCount: number;
+  children: ReactNode;
 }
 
-
-
-export function HomeHeader({
-  articleCount,
-  unreadCount,
-  children
-}: HomeHeaderProps) {
+export function HomeHeader({ articleCount, unreadCount, children }: HomeHeaderProps) {
   return (
     <header className="flex items-center justify-between border-b pb-4 mb-6">
       <div>
@@ -22,17 +16,17 @@ export function HomeHeader({
         </p>
       </div>
       {children}
-      
     </header>
-  )
+  );
 }
 
-export function HomeHeaderButton({ children, ...props }: ComponentProps<'button'>) {
-  return <button
-        {...props}
-        className="px-4 py-2 rounded bg-black text-white text-sm font-medium disabled:bg-gray-400"
-      >
-        {children}
-        
-      </button>
+export function HomeHeaderButton({ children, ...props }: ComponentProps<"button">) {
+  return (
+    <button
+      {...props}
+      className="px-4 py-2 rounded bg-black text-white text-sm font-medium disabled:bg-gray-400"
+    >
+      {children}
+    </button>
+  );
 }

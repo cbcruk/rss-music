@@ -1,17 +1,17 @@
-import { useState } from 'react'
+import { useState } from "react";
 
 export interface Track {
-  searchQuery: string
-  videoId: string | null
-  videoTitle: string | null
+  searchQuery: string;
+  videoId: string | null;
+  videoTitle: string | null;
 }
 
 interface TrackCardProps {
-  track: Track
+  track: Track;
 }
 
 export function TrackCard({ track }: TrackCardProps) {
-  const [playing, setPlaying] = useState(false)
+  const [playing, setPlaying] = useState(false);
 
   if (!track.videoId) {
     return (
@@ -24,7 +24,7 @@ export function TrackCard({ track }: TrackCardProps) {
       >
         🔍 {track.searchQuery}
       </a>
-    )
+    );
   }
 
   if (playing) {
@@ -38,7 +38,7 @@ export function TrackCard({ track }: TrackCardProps) {
           className="w-full h-full border-0"
         />
       </div>
-    )
+    );
   }
 
   return (
@@ -49,7 +49,7 @@ export function TrackCard({ track }: TrackCardProps) {
     >
       <img
         src={`https://i.ytimg.com/vi/${track.videoId}/mqdefault.jpg`}
-        alt={track.videoTitle ?? ''}
+        alt={track.videoTitle ?? ""}
         className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
       />
       <span className="absolute inset-0 flex items-center justify-center text-white text-3xl drop-shadow-lg">
@@ -59,5 +59,5 @@ export function TrackCard({ track }: TrackCardProps) {
         {track.videoTitle ?? track.searchQuery}
       </span>
     </button>
-  )
+  );
 }

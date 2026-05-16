@@ -65,15 +65,15 @@ pnpm scrape
 
 ### CLI 명령어
 
-| 명령어 | 설명 |
-|---|---|
-| `pnpm start` | 전체 파이프라인 실행 |
-| `pnpm start --no-api` | YouTube API 호출 생략 (검색 링크만 표시) |
-| `pnpm start --mark-read` | 모든 unread 기사를 read로 마킹 (긴급 클리어용) |
-| `pnpm start --import-opml <path> [--category <name>]` | OPML에서 피드 import |
-| `pnpm start --add-feed <url>` | 피드 추가 |
-| `pnpm start --remove-feed <url>` | 피드 제거 |
-| `pnpm start --list-feeds` | 등록된 피드 목록 표시 |
+| 명령어                                                | 설명                                           |
+| ----------------------------------------------------- | ---------------------------------------------- |
+| `pnpm start`                                          | 전체 파이프라인 실행                           |
+| `pnpm start --no-api`                                 | YouTube API 호출 생략 (검색 링크만 표시)       |
+| `pnpm start --mark-read`                              | 모든 unread 기사를 read로 마킹 (긴급 클리어용) |
+| `pnpm start --import-opml <path> [--category <name>]` | OPML에서 피드 import                           |
+| `pnpm start --add-feed <url>`                         | 피드 추가                                      |
+| `pnpm start --remove-feed <url>`                      | 피드 제거                                      |
+| `pnpm start --list-feeds`                             | 등록된 피드 목록 표시                          |
 
 ---
 

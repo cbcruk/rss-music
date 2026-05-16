@@ -7,9 +7,10 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3333",
-    "build": "vite build",
-    "start": "vite preview --port 3333"
+    "dev": "vp dev --port 3333",
+    "build": "vp build",
+    "start": "vp preview --port 3333",
+    "prepare": "vp config"
   },
   "dependencies": {
     "@google/genai": "^2.2.0",
@@ -39,13 +40,29 @@
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
     "typescript": "^6.0.2",
-    "vite": "^8.0.0"
+    "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+    "vite-plus": "latest"
   },
+  "packageManager": "pnpm@11.1.2",
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
       "lightningcss",
       "better-sqlite3"
-    ]
+    ],
+    "overrides": {
+      "vite": "npm:@voidzero-dev/vite-plus-core@latest",
+      "vitest": "npm:@voidzero-dev/vite-plus-test@latest"
+    },
+    "peerDependencyRules": {
+      "allowAny": [
+        "vite",
+        "vitest"
+      ],
+      "allowedVersions": {
+        "vite": "*",
+        "vitest": "*"
+      }
+    }
   }
 }
