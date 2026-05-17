@@ -29,7 +29,7 @@ export function TrackCard({ track }: TrackCardProps) {
 
   if (playing) {
     return (
-      <div className="aspect-video rounded overflow-hidden bg-black">
+      <div className="aspect-video rounded overflow-hidden bg-black col-span-full">
         <iframe
           src={`https://www.youtube.com/embed/${track.videoId}?autoplay=1`}
           title={track.videoTitle ?? track.searchQuery}
