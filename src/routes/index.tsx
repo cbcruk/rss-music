@@ -1,19 +1,15 @@
 import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
-import { HomeHeader, HomeHeaderButton } from './-components/home-header'
-import { ScrapeError } from './-components/scrape-error'
+import { ArticleSummary } from './-components/article-summary'
+import { ScrapeAction } from './-components/scrape-action'
 import { PipelineResultPanel } from './-components/pipeline-result-panel'
 import { ArticleList } from './-components/article-list'
 
 const fetchArticles = createServerFn({ method: 'GET' }).handler(async () => {
-  const { getRecentArticles, getUnreadCount, getTracksByArticleIds } = await import('#/db')
-  const articles = getRecentArticles(100)
-  const tracks = getTracksByArticleIds(articles.map((a) => a.id))
-
+  const { getRecentArticles, getUnreadCount } = await import('#/db')
   return {
-    articles,
-    tracks,
+    articles: getRecentArticles(100),
     unreadCount: getUnreadCount(),
   }
 })
@@ -55,14 +51,14 @@ function Home() {
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <HomeHeader articleCount={data.articles.length} unreadCount={data.unreadCount}>
-        <HomeHeaderButton disabled={scrape.isPending} onClick={() => scrape.mutate()}>
-          {scrape.isPending ? 'Scraping…' : 'Run scrape'}
-        </HomeHeaderButton>
-      </HomeHeader>
-      {scrape.isError && <ScrapeError message={scrape.error.message} />}
+      <ArticleSummary articleCount={data.articles.length} unreadCount={data.unreadCount} />
+      <ScrapeAction
+        isPending={scrape.isPending}
+        error={scrape.error}
+        onRun={() => scrape.mutate()}
+      />
       {scrape.isSuccess && <PipelineResultPanel result={scrape.data} />}
-      <ArticleList articles={data.articles} tracks={data.tracks} />
+      <ArticleList articles={data.articles} />
     </div>
   )
 }

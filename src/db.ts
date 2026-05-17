@@ -76,6 +76,10 @@ export interface ArticleRow {
   read: number
 }
 
+export interface ArticleWithTracks extends ArticleRow {
+  tracks: CachedTrack[]
+}
+
 export function listFeeds(): FeedRow[] {
   const rows = db
     .prepare('SELECT url, title, last_fetched_at FROM feeds ORDER BY title COLLATE NOCASE')
@@ -169,11 +173,27 @@ export function markAllRead(): number {
   return result.changes
 }
 
-export function getRecentArticles(limit = 100): ArticleRow[] {
+export function getRecentArticles(limit = 100): ArticleWithTracks[] {
   const rows = db
     .prepare(
-      `SELECT id, feed_url, title, source, url, summary, image, published, read
-       FROM articles ORDER BY COALESCE(published, created_at) DESC LIMIT ?`,
+      `SELECT
+         a.id, a.feed_url, a.title, a.source, a.url, a.summary, a.image, a.published, a.read,
+         (
+           SELECT COALESCE(
+             json_group_array(json_object(
+               'articleId',   yc.article_id,
+               'searchQuery', yc.search_query,
+               'videoId',     yc.video_id,
+               'videoTitle',  yc.video_title
+             )),
+             '[]'
+           )
+           FROM youtube_cache yc
+           WHERE yc.article_id = a.id
+         ) AS tracks_json
+       FROM articles a
+       ORDER BY COALESCE(a.published, a.created_at) DESC
+       LIMIT ?`,
     )
     .all(limit) as {
     id: string
@@ -185,6 +205,7 @@ export function getRecentArticles(limit = 100): ArticleRow[] {
     image: string | null
     published: string | null
     read: number
+    tracks_json: string
   }[]
   return rows.map((r) => ({
     id: r.id,
@@ -196,6 +217,7 @@ export function getRecentArticles(limit = 100): ArticleRow[] {
     image: r.image,
     published: r.published,
     read: r.read,
+    tracks: JSON.parse(r.tracks_json) as CachedTrack[],
   }))
 }
 
@@ -211,29 +233,6 @@ export interface CachedTrack {
   searchQuery: string
   videoId: string | null
   videoTitle: string | null
-}
-
-export function getTracksByArticleIds(ids: string[]): CachedTrack[] {
-  if (ids.length === 0) return []
-  const placeholders = ids.map(() => '?').join(',')
-  const rows = db
-    .prepare(
-      `SELECT article_id, search_query, video_id, video_title
-       FROM youtube_cache WHERE article_id IN (${placeholders})
-       ORDER BY article_id, search_query`,
-    )
-    .all(...ids) as {
-    article_id: string
-    search_query: string
-    video_id: string | null
-    video_title: string | null
-  }[]
-  return rows.map((r) => ({
-    articleId: r.article_id,
-    searchQuery: r.search_query,
-    videoId: r.video_id,
-    videoTitle: r.video_title,
-  }))
 }
 
 export function getCachedVideos(articleId: string): {
