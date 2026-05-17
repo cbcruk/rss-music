@@ -4,6 +4,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { ArticleSummary } from './-components/article-summary'
 import { ArticleTabs } from './-components/article-tabs'
 import { ScrapeAction } from './-components/scrape-action'
+import { MarkAllReadButton } from './-components/mark-all-read-button'
 import { PipelineResultPanel } from './-components/pipeline-result-panel'
 import { ArticleList } from './-components/article-list'
 import { EmptyState } from './-components/empty-state'
@@ -60,6 +61,7 @@ function Home() {
         error={scrape.error}
         onRun={() => scrape.mutate()}
       />
+      <MarkAllReadButton unreadCount={data.unreadCount} />
       {scrape.isSuccess && <PipelineResultPanel result={scrape.data} />}
       {data.articles.length === 0 ? (
         <EmptyState message="모두 읽음! 새 글이 들어오면 Run scrape으로 가져오세요." />
