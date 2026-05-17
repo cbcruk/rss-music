@@ -11,7 +11,7 @@ const PAGE_SIZE = 50
 const fetchArchive = createServerFn({ method: 'GET' })
   .inputValidator((page: number) => Math.max(1, Math.floor(page)))
   .handler(async ({ data: page }) => {
-    const { getRecentArticles, getArticleCount } = await import('#/db')
+    const { getRecentArticles, getArticleCount } = await import('#/server/db')
     return {
       articles: getRecentArticles({
         readFilter: 'read',

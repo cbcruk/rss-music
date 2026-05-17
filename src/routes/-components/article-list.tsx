@@ -1,4 +1,4 @@
-import type { ArticleWithTracks } from '#/db'
+import type { ArticleWithTracks } from '#/server/db'
 import { TrackGrid } from './track-grid'
 
 interface ArticleListProps {

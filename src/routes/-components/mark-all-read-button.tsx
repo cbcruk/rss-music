@@ -3,7 +3,7 @@ import { useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 
 const markAllAsRead = createServerFn({ method: 'POST' }).handler(async () => {
-  const { markAllRead } = await import('#/db')
+  const { markAllRead } = await import('#/server/db')
   return markAllRead()
 })
 

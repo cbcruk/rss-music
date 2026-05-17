@@ -10,7 +10,7 @@ import { ArticleList } from './-components/article-list'
 import { EmptyState } from './-components/empty-state'
 
 const fetchUnread = createServerFn({ method: 'GET' }).handler(async () => {
-  const { getRecentArticles, getArticleCount } = await import('#/db')
+  const { getRecentArticles, getArticleCount } = await import('#/server/db')
   return {
     articles: getRecentArticles({ readFilter: 'unread', limit: 10000 }),
     unreadCount: getArticleCount('unread'),
@@ -18,7 +18,7 @@ const fetchUnread = createServerFn({ method: 'GET' }).handler(async () => {
 })
 
 const runScrape = createServerFn({ method: 'POST' }).handler(async () => {
-  const { runPipeline } = await import('#/pipeline')
+  const { runPipeline } = await import('#/server/pipeline')
   const events: Array<{ kind: string; message: string }> = []
   const generator = runPipeline({ useApi: true })
 
