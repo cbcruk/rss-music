@@ -12,16 +12,16 @@ const fetchArchive = createServerFn({ method: 'GET' })
   .inputValidator((page: number) => Math.max(1, Math.floor(page)))
   .handler(async ({ data: page }) => {
     const { getRecentArticles, getArticleCount } = await import('#/server/db')
-    return {
-      articles: getRecentArticles({
+    const [articles, unreadCount, total] = await Promise.all([
+      getRecentArticles({
         readFilter: 'read',
         limit: PAGE_SIZE,
         offset: (page - 1) * PAGE_SIZE,
       }),
-      unreadCount: getArticleCount('unread'),
-      total: getArticleCount('read'),
-      page,
-    }
+      getArticleCount('unread'),
+      getArticleCount('read'),
+    ])
+    return { articles, unreadCount, total, page }
   })
 
 interface ArchiveSearch {

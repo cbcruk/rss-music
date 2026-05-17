@@ -11,10 +11,11 @@ import { EmptyState } from './-components/empty-state'
 
 const fetchUnread = createServerFn({ method: 'GET' }).handler(async () => {
   const { getRecentArticles, getArticleCount } = await import('#/server/db')
-  return {
-    articles: getRecentArticles({ readFilter: 'unread', limit: 10000 }),
-    unreadCount: getArticleCount('unread'),
-  }
+  const [articles, unreadCount] = await Promise.all([
+    getRecentArticles({ readFilter: 'unread', limit: 10000 }),
+    getArticleCount('unread'),
+  ])
+  return { articles, unreadCount }
 })
 
 const runScrape = createServerFn({ method: 'POST' }).handler(async () => {

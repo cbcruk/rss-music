@@ -13,6 +13,11 @@
     "prepare": "vp config"
   },
   "dependencies": {
+    "@effect/experimental": "^0.60.0",
+    "@effect/platform": "^0.96.1",
+    "@effect/sql": "^0.51.1",
+    "@effect/sql-drizzle": "^0.50.0",
+    "@effect/sql-sqlite-node": "^0.52.0",
     "@google/genai": "^2.2.0",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
@@ -23,7 +28,7 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
-    "better-sqlite3": "^12.8.0",
+    "drizzle-orm": "^0.45.2",
     "effect": "^3.21.2",
     "fast-xml-parser": "^5.7.3",
     "lucide-react": "^0.545.0",
@@ -35,7 +40,6 @@
   "devDependencies": {
     "@tailwindcss/typography": "^0.5.16",
     "@tanstack/devtools-vite": "latest",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",

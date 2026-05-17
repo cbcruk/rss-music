@@ -1,22 +1,22 @@
-import { fetchFeeds } from './rss.js'
+import {
+  cacheVideo,
+  getExistingArticleIds,
+  getTrackCache,
+  getUnprocessedArticles,
+  listFeeds,
+  markArticlesProcessed,
+  saveArticles,
+  touchFeed,
+  upsertFeed,
+} from './db.js'
 import { generateTracks, type TrackInput } from './gemini.js'
+import { fetchFeeds } from './rss.js'
 import { searchYouTube } from './youtube.js'
 
 export interface TrackWithVideo extends TrackInput {
   videoId: string | null
   videoTitle: string | null
 }
-import {
-  hasArticle,
-  saveArticles,
-  getTrackCache,
-  cacheVideo,
-  markArticlesProcessed,
-  listFeeds,
-  upsertFeed,
-  touchFeed,
-  getUnprocessedArticles,
-} from './db.js'
 
 export interface PipelineStats {
   feeds: number
@@ -67,7 +67,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 1: feeds
   yield stage('feeds', 'Loading feeds...')
-  const feeds = listFeeds()
+  const feeds = await listFeeds()
   if (feeds.length === 0) {
     throw new Error('No feeds registered.')
   }
@@ -85,13 +85,14 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
       continue
     }
     if (result.feedTitle) {
-      upsertFeed(result.feedUrl, result.feedTitle)
+      await upsertFeed(result.feedUrl, result.feedTitle)
     }
-    touchFeed(result.feedUrl)
+    await touchFeed(result.feedUrl)
 
-    const fresh = result.items.filter((i) => !hasArticle(i.id))
+    const existing = await getExistingArticleIds(result.items.map((i) => i.id))
+    const fresh = result.items.filter((i) => !existing.has(i.id))
     if (fresh.length > 0) {
-      saveArticles(
+      await saveArticles(
         fresh.map((i) => ({
           id: i.id,
           feedUrl: i.feedUrl,
@@ -111,7 +112,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
     `RSS: ${fetchResults.length} feeds (${stats.feedErrors} errors), ${stats.newArticles} new articles.`,
   )
 
-  const queue = getUnprocessedArticles()
+  const queue = await getUnprocessedArticles()
   if (queue.length === 0) {
     yield stage('done', 'No unprocessed articles.')
     return { tracks: [], stats }
@@ -130,7 +131,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
   // Stage 4: YouTube — batch-load cache once, then per-track lookup/fetch
   yield stage('youtube', `Searching YouTube for ${tracks.length} tracks...`)
   const trackArticleIds = [...new Set(tracks.map((t) => t.articleId))]
-  const cache = getTrackCache(trackArticleIds)
+  const cache = await getTrackCache(trackArticleIds)
   const trackResults: TrackWithVideo[] = []
 
   for (const track of tracks) {
@@ -148,7 +149,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
     try {
       const video = await searchYouTube(track.searchQuery)
-      cacheVideo(track.articleId, track.searchQuery, video.videoId, video.videoTitle)
+      await cacheVideo(track.articleId, track.searchQuery, video.videoId, video.videoTitle)
       trackResults.push({ ...track, ...video })
       stats.youtubeApiCalls++
     } catch (e) {
@@ -164,7 +165,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 5: mark as processed (read는 사용자 액션 전용)
   const articleIds = [...new Set(tracks.map((t) => t.articleId))]
-  stats.processed = markArticlesProcessed(articleIds)
+  stats.processed = await markArticlesProcessed(articleIds)
   yield stage('mark-processed', `Marked ${stats.processed} articles as processed.`)
 
   yield stage('done', 'Pipeline complete.')
