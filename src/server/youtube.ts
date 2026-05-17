@@ -1,13 +1,9 @@
 import { Context, Effect, Layer, pipe } from 'effect'
+import type { CachedVideo } from './db.js'
 import { retryByStatus } from './retry.js'
 
 const MAX_ATTEMPTS = 5
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
-
-export interface YoutubeSearchResult {
-  videoId: string | null
-  videoTitle: string | null
-}
 
 export class YoutubeClient extends Context.Tag('YoutubeClient')<
   YoutubeClient,
@@ -95,7 +91,7 @@ const searchYouTubeEffect = (query: string) =>
   pipe(
     callYoutube(query),
     Effect.retry(retryPolicy),
-    Effect.map((data): YoutubeSearchResult => {
+    Effect.map((data): CachedVideo => {
       const item = data.items?.[0]
       if (!item) return { videoId: null, videoTitle: null }
       return { videoId: item.id.videoId, videoTitle: item.snippet.title }
@@ -103,6 +99,6 @@ const searchYouTubeEffect = (query: string) =>
   )
 
 /** YouTube Data API로 검색어에 해당하는 음악 영상을 검색한다. 첫 번째 결과를 반환. */
-export function searchYouTube(query: string): Promise<YoutubeSearchResult> {
+export function searchYouTube(query: string): Promise<CachedVideo> {
   return Effect.runPromise(searchYouTubeEffect(query).pipe(Effect.provide(YoutubeClientLive)))
 }

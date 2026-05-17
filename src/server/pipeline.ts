@@ -1,7 +1,11 @@
-import type { TrackWithVideo } from './types.js'
 import { fetchFeeds } from './rss.js'
-import { generateTracks } from './gemini.js'
+import { generateTracks, type TrackInput } from './gemini.js'
 import { searchYouTube } from './youtube.js'
+
+export interface TrackWithVideo extends TrackInput {
+  videoId: string | null
+  videoTitle: string | null
+}
 import {
   hasArticle,
   saveArticles,

@@ -1,6 +1,16 @@
 import Parser from 'rss-parser'
 import { Effect } from 'effect'
-import type { RssItem } from './types.js'
+
+export interface RssItem {
+  id: string
+  feedUrl: string
+  feedTitle: string
+  title: string
+  url: string
+  summary: string | null
+  image: string | null
+  published: string | null
+}
 
 interface CustomItemFields {
   'media:content'?: { $: { url?: string } } | { $: { url?: string } }[]

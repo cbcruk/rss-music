@@ -1,7 +1,12 @@
 import { readFileSync } from 'fs'
 import { XMLParser } from 'fast-xml-parser'
 import { Effect } from 'effect'
-import type { OpmlFeed } from './types.js'
+
+export interface OpmlFeed {
+  url: string
+  title: string | null
+  category: string | null
+}
 
 export class OpmlReadError extends Error {
   readonly _tag = 'OpmlReadError'

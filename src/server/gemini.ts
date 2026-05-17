@@ -1,8 +1,15 @@
 import { Context, Effect, Layer, pipe } from 'effect'
 import { GoogleGenAI, Type } from '@google/genai'
 import type { ArticleRow } from './db.js'
-import type { TrackInput } from './types.js'
 import { retryByStatus } from './retry.js'
+
+export interface TrackInput {
+  articleId: string
+  searchQuery: string
+  articleTitle: string
+  source: string
+  url: string
+}
 
 const MODEL = 'gemini-3.1-flash-lite'
 const BATCH_SIZE = 50
