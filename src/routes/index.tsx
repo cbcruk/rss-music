@@ -2,15 +2,17 @@ import { useMutation } from '@tanstack/react-query'
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import { ArticleSummary } from './-components/article-summary'
+import { ArticleTabs } from './-components/article-tabs'
 import { ScrapeAction } from './-components/scrape-action'
 import { PipelineResultPanel } from './-components/pipeline-result-panel'
 import { ArticleList } from './-components/article-list'
+import { EmptyState } from './-components/empty-state'
 
-const fetchArticles = createServerFn({ method: 'GET' }).handler(async () => {
-  const { getRecentArticles, getUnreadCount } = await import('#/db')
+const fetchUnread = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getRecentArticles, getArticleCount } = await import('#/db')
   return {
-    articles: getRecentArticles(100),
-    unreadCount: getUnreadCount(),
+    articles: getRecentArticles({ readFilter: 'unread', limit: 10000 }),
+    unreadCount: getArticleCount('unread'),
   }
 })
 
@@ -36,7 +38,7 @@ export type ScrapeResult = Awaited<ReturnType<typeof runScrape>>
 
 export const Route = createFileRoute('/')({
   component: Home,
-  loader: () => fetchArticles(),
+  loader: () => fetchUnread(),
 })
 
 function Home() {
@@ -51,14 +53,19 @@ function Home() {
 
   return (
     <div className="mx-auto max-w-4xl p-8">
-      <ArticleSummary articleCount={data.articles.length} unreadCount={data.unreadCount} />
+      <ArticleSummary />
+      <ArticleTabs unreadCount={data.unreadCount} />
       <ScrapeAction
         isPending={scrape.isPending}
         error={scrape.error}
         onRun={() => scrape.mutate()}
       />
       {scrape.isSuccess && <PipelineResultPanel result={scrape.data} />}
-      <ArticleList articles={data.articles} />
+      {data.articles.length === 0 ? (
+        <EmptyState message="모두 읽음! 새 글이 들어오면 Run scrape으로 가져오세요." />
+      ) : (
+        <ArticleList articles={data.articles} />
+      )}
     </div>
   )
 }

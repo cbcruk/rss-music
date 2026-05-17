@@ -7,12 +7,11 @@ import {
   saveArticles,
   getCachedVideos,
   cacheVideo,
-  markAllRead as dbMarkAllRead,
-  markArticlesRead,
+  markArticlesProcessed,
   listFeeds,
   upsertFeed,
   touchFeed,
-  getUnreadArticles,
+  getUnprocessedArticles,
 } from './db.js'
 
 export interface PipelineOptions {
@@ -23,12 +22,11 @@ export interface PipelineStats {
   feeds: number
   feedErrors: number
   newArticles: number
-  backlogCleared: number
   geminiBatches: number
   trackCount: number
   cacheHits: number
   youtubeApiCalls: number
-  markedRead: number
+  processed: number
 }
 
 export interface PipelineResult {
@@ -40,7 +38,7 @@ export type PipelineEvent =
   | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string }
   | { type: 'stage'; stage: PipelineStage; message: string }
 
-export type PipelineStage = 'feeds' | 'fetch' | 'gemini' | 'youtube' | 'mark-read' | 'done'
+export type PipelineStage = 'feeds' | 'fetch' | 'gemini' | 'youtube' | 'mark-processed' | 'done'
 
 function log(message: string, level: 'info' | 'warn' | 'error' = 'info'): PipelineEvent {
   return { type: 'log', level, message }
@@ -54,18 +52,18 @@ const EMPTY_STATS: PipelineStats = {
   feeds: 0,
   feedErrors: 0,
   newArticles: 0,
-  backlogCleared: 0,
   geminiBatches: 0,
   trackCount: 0,
   cacheHits: 0,
   youtubeApiCalls: 0,
-  markedRead: 0,
+  processed: 0,
 }
 
-/** RSS fetch → Gemini 검색어 생성 → YouTube 검색 → read 마킹까지 한 사이클을 async generator로 노출.
+/** RSS fetch → Gemini 검색어 생성 → YouTube 검색 → processed 마킹까지 한 사이클을 async generator로 노출.
  * 진행 이벤트는 yield, 최종 결과(tracks)는 return으로 전달한다.
  *
- * 트랜잭션 보장: YouTube 단계가 완료되기 전까지는 이번 사이클에 fetch한 새 기사들이 read=0으로 남아 다음 실행에서 재시도된다. */
+ * read 상태는 사용자 액션 전용이므로 pipeline은 건드리지 않는다.
+ * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다. */
 export async function* runPipeline(
   options: PipelineOptions,
 ): AsyncGenerator<PipelineEvent, PipelineResult> {
@@ -80,14 +78,7 @@ export async function* runPipeline(
   stats.feeds = feeds.length
   yield log(`Loaded ${feeds.length} feeds.`)
 
-  // Backlog cleanup (hybrid marking strategy)
-  const cleared = dbMarkAllRead()
-  stats.backlogCleared = cleared
-  if (cleared > 0) {
-    yield log(`Cleared ${cleared} backlog articles (read=0 → 1).`)
-  }
-
-  // Stage 2: RSS fetch + save new articles as read=0
+  // Stage 2: RSS fetch + save new articles as read=0, processed=0
   yield stage('fetch', `Fetching ${feeds.length} feeds...`)
   const fetchResults = await fetchFeeds(feeds.map((f) => f.url))
 
@@ -124,23 +115,21 @@ export async function* runPipeline(
     `RSS: ${fetchResults.length} feeds (${stats.feedErrors} errors), ${stats.newArticles} new articles.`,
   )
 
-  const unread = getUnreadArticles()
-  if (unread.length === 0) {
-    yield stage('done', 'No unread articles to process.')
+  const queue = getUnprocessedArticles()
+  if (queue.length === 0) {
+    yield stage('done', 'No unprocessed articles.')
     return { tracks: [], stats }
   }
 
   // Stage 3: Gemini
-  yield stage('gemini', `Generating queries for ${unread.length} articles...`)
-  const tracks = await generateTracks(unread, (event) => {
+  yield stage('gemini', `Generating queries for ${queue.length} articles...`)
+  const tracks = await generateTracks(queue, (event) => {
     if (event.type === 'batch-start') {
       stats.geminiBatches = event.current
-      // Note: we can't yield from inside the callback, but we update stats.
-      // For richer streaming, callers can wrap generateTracks themselves.
     }
   })
   stats.trackCount = tracks.length
-  yield log(`Gemini produced ${tracks.length} tracks from ${unread.length} articles.`)
+  yield log(`Gemini produced ${tracks.length} tracks from ${queue.length} articles.`)
 
   // Stage 4: YouTube
   yield stage('youtube', `Searching YouTube for ${tracks.length} tracks...`)
@@ -184,10 +173,10 @@ export async function* runPipeline(
     `YouTube: ${tracks.length} tracks, ${stats.cacheHits} cached, ${stats.youtubeApiCalls} API calls${!options.useApi ? ' (link-only)' : ''}.`,
   )
 
-  // Stage 5: mark articles as read (transactional — only after YouTube step completes)
+  // Stage 5: mark as processed (read는 사용자 액션 전용)
   const articleIds = [...new Set(tracks.map((t) => t.articleId))]
-  stats.markedRead = markArticlesRead(articleIds)
-  yield stage('mark-read', `Marked ${stats.markedRead} articles as read.`)
+  stats.processed = markArticlesProcessed(articleIds)
+  yield stage('mark-processed', `Marked ${stats.processed} articles as processed.`)
 
   yield stage('done', 'Pipeline complete.')
   return { tracks: trackResults, stats }

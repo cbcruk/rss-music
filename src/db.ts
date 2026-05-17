@@ -58,6 +58,13 @@ if (!columnExists('articles', 'read')) {
   }
 }
 
+// `processed` is the pipeline-side marker (gemini + youtube done). Distinct from `read` which is user-driven.
+// Backfill: legacy rows marked read=1 were necessarily processed by the old pipeline that read=1 implied success.
+if (!columnExists('articles', 'processed')) {
+  db.exec(`ALTER TABLE articles ADD COLUMN processed INTEGER NOT NULL DEFAULT 0`)
+  db.exec(`UPDATE articles SET processed = 1 WHERE read = 1`)
+}
+
 export interface FeedRow {
   url: string
   title: string | null
@@ -173,7 +180,63 @@ export function markAllRead(): number {
   return result.changes
 }
 
-export function getRecentArticles(limit = 100): ArticleWithTracks[] {
+export function getUnprocessedArticles(): ArticleRow[] {
+  const rows = db
+    .prepare(
+      `SELECT id, feed_url, title, source, url, summary, image, published, read
+       FROM articles WHERE processed = 0 ORDER BY published DESC, created_at DESC`,
+    )
+    .all() as {
+    id: string
+    feed_url: string
+    title: string
+    source: string
+    url: string
+    summary: string | null
+    image: string | null
+    published: string | null
+    read: number
+  }[]
+  return rows.map((r) => ({
+    id: r.id,
+    feedUrl: r.feed_url,
+    title: r.title,
+    source: r.source,
+    url: r.url,
+    summary: r.summary,
+    image: r.image,
+    published: r.published,
+    read: r.read,
+  }))
+}
+
+export function markArticlesProcessed(ids: string[]): number {
+  if (ids.length === 0) return 0
+  const placeholders = ids.map(() => '?').join(',')
+  const result = db
+    .prepare(`UPDATE articles SET processed = 1 WHERE id IN (${placeholders})`)
+    .run(...ids)
+  return result.changes
+}
+
+export type ReadFilter = 'all' | 'unread' | 'read'
+
+interface GetRecentArticlesOptions {
+  limit?: number
+  offset?: number
+  readFilter?: ReadFilter
+}
+
+function readWhereClause(filter: ReadFilter): string {
+  if (filter === 'unread') return 'WHERE a.read = 0'
+  if (filter === 'read') return 'WHERE a.read = 1'
+  return ''
+}
+
+export function getRecentArticles(opts: GetRecentArticlesOptions = {}): ArticleWithTracks[] {
+  const limit = opts.limit ?? 100
+  const offset = opts.offset ?? 0
+  const where = readWhereClause(opts.readFilter ?? 'all')
   const rows = db
     .prepare(
       `SELECT
@@ -192,10 +255,11 @@ export function getRecentArticles(limit = 100): ArticleWithTracks[] {
            WHERE yc.article_id = a.id
          ) AS tracks_json
        FROM articles a
+       ${where}
        ORDER BY COALESCE(a.published, a.created_at) DESC
-       LIMIT ?`,
+       LIMIT ? OFFSET ?`,
     )
-    .all(limit) as {
+    .all(limit, offset) as {
     id: string
     feed_url: string
     title: string
@@ -221,8 +285,10 @@ export function getRecentArticles(limit = 100): ArticleWithTracks[] {
   }))
 }
 
-export function getUnreadCount(): number {
-  const row = db.prepare('SELECT COUNT(*) as count FROM articles WHERE read = 0').get() as {
+export function getArticleCount(readFilter: ReadFilter = 'all'): number {
+  const where =
+    readFilter === 'unread' ? 'WHERE read = 0' : readFilter === 'read' ? 'WHERE read = 1' : ''
+  const row = db.prepare(`SELECT COUNT(*) as count FROM articles ${where}`).get() as {
     count: number
   }
   return row.count
