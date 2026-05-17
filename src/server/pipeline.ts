@@ -5,7 +5,7 @@ import { searchYouTube } from './youtube.js'
 import {
   hasArticle,
   saveArticles,
-  getCachedVideos,
+  getTrackCache,
   cacheVideo,
   markArticlesProcessed,
   listFeeds,
@@ -13,10 +13,6 @@ import {
   touchFeed,
   getUnprocessedArticles,
 } from './db.js'
-
-export interface PipelineOptions {
-  useApi: boolean
-}
 
 export interface PipelineStats {
   feeds: number
@@ -48,32 +44,28 @@ function stage(s: PipelineStage, message: string): PipelineEvent {
   return { type: 'stage', stage: s, message }
 }
 
-const EMPTY_STATS: PipelineStats = {
-  feeds: 0,
-  feedErrors: 0,
-  newArticles: 0,
-  geminiBatches: 0,
-  trackCount: 0,
-  cacheHits: 0,
-  youtubeApiCalls: 0,
-  processed: 0,
-}
-
 /** RSS fetch → Gemini 검색어 생성 → YouTube 검색 → processed 마킹까지 한 사이클을 async generator로 노출.
  * 진행 이벤트는 yield, 최종 결과(tracks)는 return으로 전달한다.
  *
  * read 상태는 사용자 액션 전용이므로 pipeline은 건드리지 않는다.
  * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다. */
-export async function* runPipeline(
-  options: PipelineOptions,
-): AsyncGenerator<PipelineEvent, PipelineResult> {
-  const stats: PipelineStats = { ...EMPTY_STATS }
+export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResult> {
+  const stats: PipelineStats = {
+    feeds: 0,
+    feedErrors: 0,
+    newArticles: 0,
+    geminiBatches: 0,
+    trackCount: 0,
+    cacheHits: 0,
+    youtubeApiCalls: 0,
+    processed: 0,
+  }
 
   // Stage 1: feeds
   yield stage('feeds', 'Loading feeds...')
   const feeds = listFeeds()
   if (feeds.length === 0) {
-    throw new Error('No feeds registered. Run with --import-opml <path> or --add-feed <url>.')
+    throw new Error('No feeds registered.')
   }
   stats.feeds = feeds.length
   yield log(`Loaded ${feeds.length} feeds.`)
@@ -131,8 +123,10 @@ export async function* runPipeline(
   stats.trackCount = tracks.length
   yield log(`Gemini produced ${tracks.length} tracks from ${queue.length} articles.`)
 
-  // Stage 4: YouTube
+  // Stage 4: YouTube — batch-load cache once, then per-track lookup/fetch
   yield stage('youtube', `Searching YouTube for ${tracks.length} tracks...`)
+  const trackArticleIds = [...new Set(tracks.map((t) => t.articleId))]
+  const cache = getTrackCache(trackArticleIds)
   const trackResults: TrackWithVideo[] = []
 
   for (const track of tracks) {
@@ -141,18 +135,9 @@ export async function* runPipeline(
       continue
     }
 
-    if (!options.useApi) {
-      trackResults.push({ ...track, videoId: null, videoTitle: null })
-      continue
-    }
-
-    const cached = getCachedVideos(track.articleId).find((c) => c.searchQuery === track.searchQuery)
+    const cached = cache.get(`${track.articleId}|${track.searchQuery}`)
     if (cached) {
-      trackResults.push({
-        ...track,
-        videoId: cached.videoId,
-        videoTitle: cached.videoTitle,
-      })
+      trackResults.push({ ...track, ...cached })
       stats.cacheHits++
       continue
     }
@@ -170,7 +155,7 @@ export async function* runPipeline(
   }
 
   yield log(
-    `YouTube: ${tracks.length} tracks, ${stats.cacheHits} cached, ${stats.youtubeApiCalls} API calls${!options.useApi ? ' (link-only)' : ''}.`,
+    `YouTube: ${tracks.length} tracks, ${stats.cacheHits} cached, ${stats.youtubeApiCalls} API calls.`,
   )
 
   // Stage 5: mark as processed (read는 사용자 액션 전용)

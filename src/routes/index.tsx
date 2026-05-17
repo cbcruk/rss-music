@@ -20,7 +20,7 @@ const fetchUnread = createServerFn({ method: 'GET' }).handler(async () => {
 const runScrape = createServerFn({ method: 'POST' }).handler(async () => {
   const { runPipeline } = await import('#/server/pipeline')
   const events: Array<{ kind: string; message: string }> = []
-  const generator = runPipeline({ useApi: true })
+  const generator = runPipeline()
 
   while (true) {
     const { value, done } = await generator.next()

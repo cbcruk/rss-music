@@ -87,6 +87,32 @@ export interface ArticleWithTracks extends ArticleRow {
   tracks: CachedTrack[]
 }
 
+interface ArticleRowSql {
+  id: string
+  feed_url: string
+  title: string
+  source: string
+  url: string
+  summary: string | null
+  image: string | null
+  published: string | null
+  read: number
+}
+
+function mapArticleRow(r: ArticleRowSql): ArticleRow {
+  return {
+    id: r.id,
+    feedUrl: r.feed_url,
+    title: r.title,
+    source: r.source,
+    url: r.url,
+    summary: r.summary,
+    image: r.image,
+    published: r.published,
+    read: r.read,
+  }
+}
+
 export function listFeeds(): FeedRow[] {
   const rows = db
     .prepare('SELECT url, title, last_fetched_at FROM feeds ORDER BY title COLLATE NOCASE')
@@ -138,32 +164,8 @@ export function getUnreadArticles(): ArticleRow[] {
       `SELECT id, feed_url, title, source, url, summary, image, published, read
        FROM articles WHERE read = 0 ORDER BY published DESC, created_at DESC`,
     )
-    .all() as {
-    id: string
-    feed_url: string
-    title: string
-    source: string
-    url: string
-    summary: string | null
-    image: string | null
-    published: string | null
-    read: number
-  }[]
-  return rows.map((r) => ({
-    id: r.id,
-    feedUrl: r.feed_url,
-    title: r.title,
-    source: r.source,
-    url: r.url,
-    summary: r.summary,
-    image: r.image,
-    published: r.published,
-    read: r.read,
-  }))
-}
-
-export function markRead(id: string): void {
-  db.prepare('UPDATE articles SET read = 1 WHERE id = ?').run(id)
+    .all() as ArticleRowSql[]
+  return rows.map(mapArticleRow)
 }
 
 export function markArticlesRead(ids: string[]): number {
@@ -186,28 +188,8 @@ export function getUnprocessedArticles(): ArticleRow[] {
       `SELECT id, feed_url, title, source, url, summary, image, published, read
        FROM articles WHERE processed = 0 ORDER BY published DESC, created_at DESC`,
     )
-    .all() as {
-    id: string
-    feed_url: string
-    title: string
-    source: string
-    url: string
-    summary: string | null
-    image: string | null
-    published: string | null
-    read: number
-  }[]
-  return rows.map((r) => ({
-    id: r.id,
-    feedUrl: r.feed_url,
-    title: r.title,
-    source: r.source,
-    url: r.url,
-    summary: r.summary,
-    image: r.image,
-    published: r.published,
-    read: r.read,
-  }))
+    .all() as ArticleRowSql[]
+  return rows.map(mapArticleRow)
 }
 
 export function markArticlesProcessed(ids: string[]): number {
@@ -259,28 +241,9 @@ export function getRecentArticles(opts: GetRecentArticlesOptions = {}): ArticleW
        ORDER BY COALESCE(a.published, a.created_at) DESC
        LIMIT ? OFFSET ?`,
     )
-    .all(limit, offset) as {
-    id: string
-    feed_url: string
-    title: string
-    source: string
-    url: string
-    summary: string | null
-    image: string | null
-    published: string | null
-    read: number
-    tracks_json: string
-  }[]
+    .all(limit, offset) as (ArticleRowSql & { tracks_json: string })[]
   return rows.map((r) => ({
-    id: r.id,
-    feedUrl: r.feed_url,
-    title: r.title,
-    source: r.source,
-    url: r.url,
-    summary: r.summary,
-    image: r.image,
-    published: r.published,
-    read: r.read,
+    ...mapArticleRow(r),
     tracks: JSON.parse(r.tracks_json) as CachedTrack[],
   }))
 }
@@ -301,23 +264,34 @@ export interface CachedTrack {
   videoTitle: string | null
 }
 
-export function getCachedVideos(articleId: string): {
-  searchQuery: string
+export interface CachedVideo {
   videoId: string | null
   videoTitle: string | null
-}[] {
+}
+
+/** Bulk-fetch cached videos for the given articleIds, keyed by `${articleId}|${searchQuery}` for O(1) lookup. */
+export function getTrackCache(articleIds: string[]): Map<string, CachedVideo> {
+  const map = new Map<string, CachedVideo>()
+  if (articleIds.length === 0) return map
+  const placeholders = articleIds.map(() => '?').join(',')
   const rows = db
-    .prepare('SELECT search_query, video_id, video_title FROM youtube_cache WHERE article_id = ?')
-    .all(articleId) as {
+    .prepare(
+      `SELECT article_id, search_query, video_id, video_title
+       FROM youtube_cache WHERE article_id IN (${placeholders})`,
+    )
+    .all(...articleIds) as {
+    article_id: string
     search_query: string
     video_id: string | null
     video_title: string | null
   }[]
-  return rows.map((r) => ({
-    searchQuery: r.search_query,
-    videoId: r.video_id,
-    videoTitle: r.video_title,
-  }))
+  for (const r of rows) {
+    map.set(`${r.article_id}|${r.search_query}`, {
+      videoId: r.video_id,
+      videoTitle: r.video_title,
+    })
+  }
+  return map
 }
 
 export function cacheVideo(

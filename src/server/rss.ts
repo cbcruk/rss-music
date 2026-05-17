@@ -1,4 +1,5 @@
 import Parser from 'rss-parser'
+import { Effect } from 'effect'
 import type { RssItem } from './types.js'
 
 interface CustomItemFields {
@@ -16,6 +17,16 @@ const parser = new Parser<{}, CustomItemFields>({
     item: ['media:content', 'media:thumbnail', 'enclosure', 'content:encoded'],
   },
 })
+
+export class RssFetchError extends Error {
+  readonly _tag = 'RssFetchError'
+  constructor(
+    message: string,
+    public readonly feedUrl: string,
+  ) {
+    super(message)
+  }
+}
 
 function pickImage(item: Parser.Item & CustomItemFields): string | null {
   const media = item['media:content']
@@ -46,24 +57,25 @@ function pickId(item: Parser.Item & CustomItemFields, feedUrl: string): string {
   return item.guid || item.id || item.link || `${feedUrl}#${item.title ?? ''}`
 }
 
-export async function fetchFeed(feedUrl: string): Promise<{
-  feedTitle: string
-  items: RssItem[]
-}> {
-  const feed = await parser.parseURL(feedUrl)
-  const feedTitle = feed.title ?? feedUrl
-  const items: RssItem[] = (feed.items ?? []).map((item) => ({
-    id: pickId(item, feedUrl),
-    feedUrl,
-    feedTitle,
-    title: item.title ?? '',
-    url: item.link ?? '',
-    summary: item.contentSnippet ?? item.summary ?? null,
-    image: pickImage(item),
-    published: item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null),
-  }))
-  return { feedTitle, items }
-}
+const fetchFeedEffect = (feedUrl: string) =>
+  Effect.gen(function* () {
+    const feed = yield* Effect.tryPromise({
+      try: () => parser.parseURL(feedUrl),
+      catch: (e) => new RssFetchError(e instanceof Error ? e.message : String(e), feedUrl),
+    })
+    const feedTitle = feed.title ?? feedUrl
+    const items: RssItem[] = (feed.items ?? []).map((item) => ({
+      id: pickId(item, feedUrl),
+      feedUrl,
+      feedTitle,
+      title: item.title ?? '',
+      url: item.link ?? '',
+      summary: item.contentSnippet ?? item.summary ?? null,
+      image: pickImage(item),
+      published: item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null),
+    }))
+    return { feedTitle, items }
+  })
 
 export interface FetchResult {
   feedUrl: string
@@ -72,20 +84,29 @@ export interface FetchResult {
   error: string | null
 }
 
-export async function fetchFeeds(feedUrls: string[]): Promise<FetchResult[]> {
-  return Promise.all(
-    feedUrls.map(async (url): Promise<FetchResult> => {
-      try {
-        const { feedTitle, items } = await fetchFeed(url)
-        return { feedUrl: url, feedTitle, items, error: null }
-      } catch (e) {
-        return {
-          feedUrl: url,
-          feedTitle: null,
-          items: [],
-          error: e instanceof Error ? e.message : String(e),
-        }
-      }
-    }),
+const fetchFeedsEffect = (feedUrls: string[]) =>
+  Effect.forEach(
+    feedUrls,
+    (url) =>
+      fetchFeedEffect(url).pipe(
+        Effect.match({
+          onSuccess: ({ feedTitle, items }): FetchResult => ({
+            feedUrl: url,
+            feedTitle,
+            items,
+            error: null,
+          }),
+          onFailure: (e): FetchResult => ({
+            feedUrl: url,
+            feedTitle: null,
+            items: [],
+            error: e.message,
+          }),
+        }),
+      ),
+    { concurrency: 'unbounded' },
   )
+
+export function fetchFeeds(feedUrls: string[]): Promise<FetchResult[]> {
+  return Effect.runPromise(fetchFeedsEffect(feedUrls))
 }

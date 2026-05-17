@@ -1,6 +1,15 @@
 import { readFileSync } from 'fs'
 import { XMLParser } from 'fast-xml-parser'
+import { Effect } from 'effect'
 import type { OpmlFeed } from './types.js'
+
+export class OpmlReadError extends Error {
+  readonly _tag = 'OpmlReadError'
+}
+
+export class OpmlParseError extends Error {
+  readonly _tag = 'OpmlParseError'
+}
 
 interface OpmlOutline {
   '@_text'?: string
@@ -37,12 +46,30 @@ function walk(
   }
 }
 
-export function parseOpml(filePath: string): OpmlFeed[] {
-  const xml = readFileSync(filePath, 'utf8')
-  const parsed = xmlParser.parse(xml)
-  const body = parsed?.opml?.body
-  if (!body) return []
-  const out: OpmlFeed[] = []
-  walk(body.outline, null, out)
-  return out
+const readOpml = (filePath: string) =>
+  Effect.try({
+    try: () => readFileSync(filePath, 'utf8'),
+    catch: (e) => new OpmlReadError(e instanceof Error ? e.message : String(e)),
+  })
+
+const parseXml = (xml: string) =>
+  Effect.try({
+    try: () =>
+      xmlParser.parse(xml) as { opml?: { body?: { outline?: OpmlOutline | OpmlOutline[] } } },
+    catch: (e) => new OpmlParseError(e instanceof Error ? e.message : String(e)),
+  })
+
+const parseOpmlEffect = (filePath: string) =>
+  Effect.gen(function* () {
+    const xml = yield* readOpml(filePath)
+    const parsed = yield* parseXml(xml)
+    const body = parsed?.opml?.body
+    if (!body) return [] as OpmlFeed[]
+    const out: OpmlFeed[] = []
+    walk(body.outline, null, out)
+    return out
+  })
+
+export function parseOpml(filePath: string): Promise<OpmlFeed[]> {
+  return Effect.runPromise(parseOpmlEffect(filePath))
 }

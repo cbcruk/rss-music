@@ -1,9 +1,13 @@
+import { Context, Effect, Layer, pipe } from 'effect'
 import { GoogleGenAI, Type } from '@google/genai'
 import type { ArticleRow } from './db.js'
 import type { TrackInput } from './types.js'
+import { retryByStatus } from './retry.js'
 
 const MODEL = 'gemini-3.1-flash-lite'
 const BATCH_SIZE = 50
+const MAX_ATTEMPTS = 5
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
 
 const SYSTEM_INSTRUCTION = `You analyze music articles and produce YouTube search queries for tracks mentioned in them.
 
@@ -31,99 +35,129 @@ const RESPONSE_SCHEMA = {
   },
 }
 
+export class GeminiClient extends Context.Tag('GeminiClient')<
+  GeminiClient,
+  { readonly ai: GoogleGenAI }
+>() {}
+
+export class MissingGeminiApiKeyError extends Error {
+  readonly _tag = 'MissingGeminiApiKeyError'
+  constructor() {
+    super('GEMINI_API_KEY is required')
+  }
+}
+
+export const GeminiClientLive = Layer.effect(
+  GeminiClient,
+  Effect.gen(function* () {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) return yield* Effect.fail(new MissingGeminiApiKeyError())
+    return { ai: new GoogleGenAI({ apiKey }) }
+  }),
+)
+
+export class GeminiApiError extends Error {
+  readonly _tag = 'GeminiApiError'
+  constructor(
+    public readonly status: number | undefined,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+export class GeminiParseError extends Error {
+  readonly _tag = 'GeminiParseError'
+}
+
+type GeminiError = GeminiApiError | GeminiParseError
+
+export type GeminiProgressEvent = {
+  type: 'batch-start'
+  current: number
+  total: number
+  size: number
+}
+
+export type GeminiProgressCallback = (event: GeminiProgressEvent) => void
+
 function formatArticles(articles: ArticleRow[]): string {
   return articles
     .map((a) => `articleId: ${a.id}\ntitle: ${a.title}\nsource: ${a.source}\nurl: ${a.url}`)
     .join('\n\n---\n\n')
 }
 
-const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
-const MAX_ATTEMPTS = 5
+const callGemini = (articles: ArticleRow[]) =>
+  Effect.gen(function* () {
+    const { ai } = yield* GeminiClient
+    return yield* Effect.tryPromise({
+      try: () =>
+        ai.models.generateContent({
+          model: MODEL,
+          contents: formatArticles(articles),
+          config: {
+            systemInstruction: SYSTEM_INSTRUCTION,
+            responseMimeType: 'application/json',
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        }),
+      catch: (e) => {
+        const status = (e as { status?: number })?.status
+        return new GeminiApiError(status, e instanceof Error ? e.message : String(e))
+      },
+    })
+  })
 
-export type GeminiProgressEvent =
-  | { type: 'batch-start'; current: number; total: number; size: number }
-  | { type: 'batch-retry'; label: string; attempt: number; status: number; delayMs: number }
+const parseTracks = (text: string | undefined) =>
+  Effect.try({
+    try: () => {
+      if (!text) return [] as TrackInput[]
+      return JSON.parse(text) as TrackInput[]
+    },
+    catch: (e) => new GeminiParseError(e instanceof Error ? e.message : String(e)),
+  })
 
-export type GeminiProgressCallback = (event: GeminiProgressEvent) => void
+const isRetryable = (err: GeminiError): boolean =>
+  err._tag === 'GeminiApiError' &&
+  typeof err.status === 'number' &&
+  RETRYABLE_STATUSES.has(err.status)
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  label: string,
-  onProgress: GeminiProgressCallback | undefined,
-): Promise<T> {
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      return await fn()
-    } catch (e) {
-      const status = (e as { status?: number })?.status
-      const retryable = typeof status === 'number' && RETRYABLE_STATUSES.has(status)
-      if (!retryable || attempt === MAX_ATTEMPTS) throw e
-      const delay = Math.min(1000 * 2 ** (attempt - 1), 16000) + Math.random() * 500
-      onProgress?.({
-        type: 'batch-retry',
-        label,
-        attempt,
-        status: status as number,
-        delayMs: Math.round(delay),
-      })
-      await new Promise((r) => setTimeout(r, delay))
-    }
-  }
-  throw new Error('unreachable')
-}
+const retryPolicy = retryByStatus<GeminiError>({
+  isRetryable,
+  maxAttempts: MAX_ATTEMPTS,
+  label: 'Gemini',
+})
 
-async function generateBatch(
-  ai: GoogleGenAI,
-  articles: ArticleRow[],
-  batchLabel: string,
-  onProgress: GeminiProgressCallback | undefined,
-): Promise<TrackInput[]> {
-  const response = await withRetry(
-    () =>
-      ai.models.generateContent({
-        model: MODEL,
-        contents: formatArticles(articles),
-        config: {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          responseMimeType: 'application/json',
-          responseSchema: RESPONSE_SCHEMA,
-        },
-      }),
-    batchLabel,
-    onProgress,
+const generateBatch = (articles: ArticleRow[]) =>
+  pipe(
+    callGemini(articles),
+    Effect.flatMap((response) => parseTracks(response.text)),
+    Effect.retry(retryPolicy),
   )
 
-  const text = response.text
-  if (!text) return []
-  return JSON.parse(text) as TrackInput[]
-}
+const generateTracksEffect = (articles: ArticleRow[], onProgress?: GeminiProgressCallback) =>
+  Effect.gen(function* () {
+    const total = Math.ceil(articles.length / BATCH_SIZE)
+    const tracks: TrackInput[] = []
+    for (let i = 0; i < articles.length; i += BATCH_SIZE) {
+      const batch = articles.slice(i, i + BATCH_SIZE)
+      const current = Math.floor(i / BATCH_SIZE) + 1
+      if (onProgress) {
+        yield* Effect.sync(() =>
+          onProgress({ type: 'batch-start', current, total, size: batch.length }),
+        )
+      }
+      const result = yield* generateBatch(batch)
+      tracks.push(...result)
+    }
+    return tracks
+  })
 
-export async function generateTracks(
+export function generateTracks(
   articles: ArticleRow[],
   onProgress?: GeminiProgressCallback,
 ): Promise<TrackInput[]> {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is required')
-  }
-
-  const ai = new GoogleGenAI({ apiKey })
-  const totalBatches = Math.ceil(articles.length / BATCH_SIZE)
-  const tracks: TrackInput[] = []
-
-  for (let i = 0; i < articles.length; i += BATCH_SIZE) {
-    const batch = articles.slice(i, i + BATCH_SIZE)
-    const batchNo = Math.floor(i / BATCH_SIZE) + 1
-    const label = `Gemini batch ${batchNo}/${totalBatches}`
-    onProgress?.({
-      type: 'batch-start',
-      current: batchNo,
-      total: totalBatches,
-      size: batch.length,
-    })
-    const batchResults = await generateBatch(ai, batch, label, onProgress)
-    tracks.push(...batchResults)
-  }
-
-  return tracks
+  return Effect.runPromise(
+    generateTracksEffect(articles, onProgress).pipe(Effect.provide(GeminiClientLive)),
+  )
 }

@@ -24,6 +24,7 @@
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
     "better-sqlite3": "^12.8.0",
+    "effect": "^3.21.2",
     "fast-xml-parser": "^5.7.3",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",
