@@ -109,6 +109,9 @@ importers:
       vite-plus:
         specifier: latest
         version: 0.1.21(@types/node@22.19.19)(@voidzero-dev/vite-plus-core@0.1.21(@types/node@22.19.19)(jiti@2.7.0)(typescript@6.0.3))(jiti@2.7.0)(typescript@6.0.3)
+      vitest:
+        specifier: npm:@voidzero-dev/vite-plus-test@^0.1.21
+        version: '@voidzero-dev/vite-plus-test@0.1.21(@types/node@22.19.19)(@voidzero-dev/vite-plus-core@0.1.21(@types/node@22.19.19)(jiti@2.7.0)(typescript@6.0.3))(jiti@2.7.0)(typescript@6.0.3)'
 
 packages:
 

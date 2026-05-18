@@ -1,5 +1,6 @@
 import { Context, Effect, Layer, pipe } from 'effect'
 import type { CachedVideo } from './db.js'
+import { Fetcher, FetcherLive } from './fetcher.js'
 import { retryByStatus } from './retry.js'
 
 const MAX_ATTEMPTS = 5
@@ -54,15 +55,15 @@ interface SearchResponse {
 const callYoutube = (query: string) =>
   Effect.gen(function* () {
     const { apiKey } = yield* YoutubeClient
+    const { fetch } = yield* Fetcher
     const url =
       'https://www.googleapis.com/youtube/v3/search' +
       '?part=snippet&type=video&videoCategoryId=10&maxResults=1' +
       `&q=${encodeURIComponent(query)}&key=${apiKey}`
 
-    const res = yield* Effect.tryPromise({
-      try: () => fetch(url),
-      catch: (e) => new YoutubeApiError(undefined, e instanceof Error ? e.message : String(e)),
-    })
+    const res = yield* fetch(url).pipe(
+      Effect.mapError((e) => new YoutubeApiError(undefined, e.message)),
+    )
 
     if (!res.ok) {
       return yield* Effect.fail(
@@ -87,7 +88,7 @@ const retryPolicy = retryByStatus<YoutubeError>({
   label: 'YouTube',
 })
 
-const searchYouTubeEffect = (query: string) =>
+export const searchYouTubeEffect = (query: string) =>
   pipe(
     callYoutube(query),
     Effect.retry(retryPolicy),
@@ -100,5 +101,7 @@ const searchYouTubeEffect = (query: string) =>
 
 /** YouTube Data API로 검색어에 해당하는 음악 영상을 검색한다. 첫 번째 결과를 반환. */
 export function searchYouTube(query: string): Promise<CachedVideo> {
-  return Effect.runPromise(searchYouTubeEffect(query).pipe(Effect.provide(YoutubeClientLive)))
+  return Effect.runPromise(
+    searchYouTubeEffect(query).pipe(Effect.provide(YoutubeClientLive), Effect.provide(FetcherLive)),
+  )
 }
