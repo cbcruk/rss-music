@@ -1,5 +1,5 @@
 import Parser from 'rss-parser'
-import { Effect } from 'effect'
+import { Context, Effect, Layer } from 'effect'
 
 export interface RssItem {
   id: string
@@ -12,7 +12,7 @@ export interface RssItem {
   published: string | null
 }
 
-interface CustomItemFields {
+export interface CustomItemFields {
   'media:content'?: { $: { url?: string } } | { $: { url?: string } }[]
   'media:thumbnail'?: { $: { url?: string } } | { $: { url?: string } }[]
   enclosure?: { url?: string; type?: string }
@@ -20,12 +20,37 @@ interface CustomItemFields {
   id?: string
 }
 
-const parser = new Parser<{}, CustomItemFields>({
-  timeout: 15000,
-  headers: { 'User-Agent': 'rss-extensions/1.0 (+https://github.com/)' },
-  customFields: {
-    item: ['media:content', 'media:thumbnail', 'enclosure', 'content:encoded'],
-  },
+export type ParsedItem = Parser.Item & CustomItemFields
+
+export interface ParsedFeed {
+  title?: string
+  items?: ParsedItem[]
+}
+
+export class RssParserError extends Error {
+  readonly _tag = 'RssParserError'
+}
+
+export class RssParser extends Context.Tag('RssParser')<
+  RssParser,
+  { readonly parseURL: (url: string) => Effect.Effect<ParsedFeed, RssParserError> }
+>() {}
+
+export const RssParserLive = Layer.sync(RssParser, () => {
+  const parser = new Parser<{}, CustomItemFields>({
+    timeout: 15000,
+    headers: { 'User-Agent': 'rss-extensions/1.0 (+https://github.com/)' },
+    customFields: {
+      item: ['media:content', 'media:thumbnail', 'enclosure', 'content:encoded'],
+    },
+  })
+  return {
+    parseURL: (url) =>
+      Effect.tryPromise({
+        try: () => parser.parseURL(url) as Promise<ParsedFeed>,
+        catch: (e) => new RssParserError(e instanceof Error ? e.message : String(e)),
+      }),
+  }
 })
 
 export class RssFetchError extends Error {
@@ -38,7 +63,7 @@ export class RssFetchError extends Error {
   }
 }
 
-function pickImage(item: Parser.Item & CustomItemFields): string | null {
+export function pickImage(item: ParsedItem): string | null {
   const media = item['media:content']
   if (media) {
     const arr = Array.isArray(media) ? media : [media]
@@ -63,16 +88,16 @@ function pickImage(item: Parser.Item & CustomItemFields): string | null {
   return match ? match[1] : null
 }
 
-function pickId(item: Parser.Item & CustomItemFields, feedUrl: string): string {
+export function pickId(item: ParsedItem, feedUrl: string): string {
   return item.guid || item.id || item.link || `${feedUrl}#${item.title ?? ''}`
 }
 
-const fetchFeedEffect = (feedUrl: string) =>
+export const fetchFeedEffect = (feedUrl: string) =>
   Effect.gen(function* () {
-    const feed = yield* Effect.tryPromise({
-      try: () => parser.parseURL(feedUrl),
-      catch: (e) => new RssFetchError(e instanceof Error ? e.message : String(e), feedUrl),
-    })
+    const { parseURL } = yield* RssParser
+    const feed = yield* parseURL(feedUrl).pipe(
+      Effect.mapError((e) => new RssFetchError(e.message, feedUrl)),
+    )
     const feedTitle = feed.title ?? feedUrl
     const items: RssItem[] = (feed.items ?? []).map((item) => ({
       id: pickId(item, feedUrl),
@@ -94,7 +119,7 @@ export interface FetchResult {
   error: string | null
 }
 
-const fetchFeedsEffect = (feedUrls: string[]) =>
+export const fetchFeedsEffect = (feedUrls: string[]) =>
   Effect.forEach(
     feedUrls,
     (url) =>
@@ -118,5 +143,5 @@ const fetchFeedsEffect = (feedUrls: string[]) =>
   )
 
 export function fetchFeeds(feedUrls: string[]): Promise<FetchResult[]> {
-  return Effect.runPromise(fetchFeedsEffect(feedUrls))
+  return Effect.runPromise(fetchFeedsEffect(feedUrls).pipe(Effect.provide(RssParserLive)))
 }
