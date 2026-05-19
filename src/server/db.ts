@@ -1,14 +1,14 @@
 import { SqlClient } from '@effect/sql'
 import { SqliteClient } from '@effect/sql-sqlite-node'
 import * as SqliteDrizzle from '@effect/sql-drizzle/Sqlite'
-import { desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { Effect, Layer, ManagedRuntime } from 'effect'
 import { dirname, join } from 'path'
 import { fileURLToPath } from 'url'
 import { articles, feeds, youtubeCache } from './schema.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = join(__dirname, '..', '..', 'data', 'cache.db')
+const DB_PATH = process.env.RSS_DB_PATH ?? join(__dirname, '..', '..', 'data', 'cache.db')
 
 const migrate = Effect.gen(function* () {
   const sqlClient = yield* SqlClient.SqlClient
@@ -150,8 +150,12 @@ export function removeFeed(url: string): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      const result = yield* db.delete(feeds).where(eq(feeds.url, url))
-      return Number((result as { rowsAffected?: number }).rowsAffected ?? 0)
+      const before = yield* db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(feeds)
+        .where(eq(feeds.url, url))
+      yield* db.delete(feeds).where(eq(feeds.url, url))
+      return before[0]?.count ?? 0
     }),
   )
 }
@@ -245,8 +249,12 @@ export function markArticlesRead(ids: string[]): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      const result = yield* db.update(articles).set({ read: 1 }).where(inArray(articles.id, ids))
-      return Number((result as { rowsAffected?: number }).rowsAffected ?? 0)
+      const before = yield* db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(articles)
+        .where(and(inArray(articles.id, ids), eq(articles.read, 0)))
+      yield* db.update(articles).set({ read: 1 }).where(inArray(articles.id, ids))
+      return before[0]?.count ?? 0
     }),
   )
 }
@@ -255,8 +263,12 @@ export function markAllRead(): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      const result = yield* db.update(articles).set({ read: 1 }).where(eq(articles.read, 0))
-      return Number((result as { rowsAffected?: number }).rowsAffected ?? 0)
+      const before = yield* db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(articles)
+        .where(eq(articles.read, 0))
+      yield* db.update(articles).set({ read: 1 }).where(eq(articles.read, 0))
+      return before[0]?.count ?? 0
     }),
   )
 }
@@ -289,11 +301,12 @@ export function markArticlesProcessed(ids: string[]): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      const result = yield* db
-        .update(articles)
-        .set({ processed: 1 })
-        .where(inArray(articles.id, ids))
-      return Number((result as { rowsAffected?: number }).rowsAffected ?? 0)
+      const before = yield* db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(articles)
+        .where(and(inArray(articles.id, ids), eq(articles.processed, 0)))
+      yield* db.update(articles).set({ processed: 1 }).where(inArray(articles.id, ids))
+      return before[0]?.count ?? 0
     }),
   )
 }
@@ -424,6 +437,18 @@ export function cacheVideo(
           target: [youtubeCache.articleId, youtubeCache.searchQuery],
           set: { videoId, videoTitle },
         })
+    }),
+  )
+}
+
+/** @internal — 테스트 전용. production 호출 금지. */
+export function __truncateAllForTesting(): Promise<void> {
+  return runtime.runPromise(
+    Effect.gen(function* () {
+      const db = yield* SqliteDrizzle.SqliteDrizzle
+      yield* db.delete(youtubeCache)
+      yield* db.delete(articles)
+      yield* db.delete(feeds)
     }),
   )
 }

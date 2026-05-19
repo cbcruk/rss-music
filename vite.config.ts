@@ -14,6 +14,7 @@ const config = defineConfig({
   lint: { options: { typeAware: true, typeCheck: true }, ignorePatterns: ['src/routeTree.gen.ts'] },
   resolve: { tsconfigPaths: true },
   plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
+  test: { setupFiles: ['./vitest-setup.ts'] },
 })
 
 export default config
