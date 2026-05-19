@@ -1,4 +1,4 @@
-import type { ScrapeResult } from '../index'
+import type { ScrapeResult } from '../-hooks/use-scrape'
 
 interface PipelineResultPanelProps {
   result: ScrapeResult

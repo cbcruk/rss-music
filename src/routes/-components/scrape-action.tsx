@@ -1,6 +1,6 @@
 interface ScrapeActionProps {
   isPending: boolean
-  error: Error | null
+  error: string | null
   onRun: () => void
 }
 
@@ -14,9 +14,7 @@ export function ScrapeAction({ isPending, error, onRun }: ScrapeActionProps) {
       >
         {isPending ? 'Scraping…' : 'Run scrape'}
       </button>
-      {error && (
-        <div className="mt-2 p-3 rounded bg-red-50 text-red-700 text-sm">{error.message}</div>
-      )}
+      {error && <div className="mt-2 p-3 rounded bg-red-50 text-red-700 text-sm">{error}</div>}
     </div>
   )
 }
