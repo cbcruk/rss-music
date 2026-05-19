@@ -88,7 +88,7 @@ export type GeminiProgressEvent = {
 
 export type GeminiProgressCallback = (event: GeminiProgressEvent) => void
 
-function formatArticles(articles: ArticleRow[]): string {
+export function formatArticles(articles: ArticleRow[]): string {
   return articles
     .map((a) => `articleId: ${a.id}\ntitle: ${a.title}\nsource: ${a.source}\nurl: ${a.url}`)
     .join('\n\n---\n\n')
@@ -115,7 +115,7 @@ const callGemini = (articles: ArticleRow[]) =>
     })
   })
 
-const parseTracks = (text: string | undefined) =>
+export const parseTracks = (text: string | undefined) =>
   Effect.try({
     try: () => {
       if (!text) return [] as TrackInput[]
@@ -124,7 +124,7 @@ const parseTracks = (text: string | undefined) =>
     catch: (e) => new GeminiParseError(e instanceof Error ? e.message : String(e)),
   })
 
-const isRetryable = (err: GeminiError): boolean =>
+export const isRetryable = (err: GeminiError): boolean =>
   err._tag === 'GeminiApiError' &&
   typeof err.status === 'number' &&
   RETRYABLE_STATUSES.has(err.status)
