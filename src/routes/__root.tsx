@@ -1,8 +1,11 @@
-import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { SidebarInset, SidebarProvider } from '#/ui/sidebar'
+import { TooltipProvider } from '#/ui/tooltip'
+import { AppSidebar } from './-components/app-sidebar/app-sidebar'
 import appCss from '../styles.css?url'
 
 interface RouterContext {
@@ -31,7 +34,21 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  component: AppLayout,
 })
+
+function AppLayout() {
+  return (
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <Outlet />
+        </SidebarInset>
+      </SidebarProvider>
+    </TooltipProvider>
+  )
+}
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   const { queryClient } = Route.useRouteContext()

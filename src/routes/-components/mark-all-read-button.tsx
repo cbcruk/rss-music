@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
+import { Button } from '#/ui/button'
 
 const markAllAsRead = createServerFn({ method: 'POST' }).handler(async () => {
   const { markAllRead } = await import('#/server/db')
@@ -23,12 +24,10 @@ export function MarkAllReadButton({ unreadCount }: MarkAllReadButtonProps) {
   if (unreadCount === 0) return null
 
   return (
-    <button
-      onClick={() => mutation.mutate()}
-      disabled={mutation.isPending}
-      className="mb-4 px-4 py-2 rounded border text-sm font-medium hover:bg-gray-50 disabled:text-gray-400"
-    >
-      {mutation.isPending ? 'Marking…' : `Mark all ${unreadCount} read`}
-    </button>
+    <div className="mb-4">
+      <Button variant="secondary" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
+        {mutation.isPending ? 'Marking…' : `Mark all ${unreadCount} read`}
+      </Button>
+    </div>
   )
 }
