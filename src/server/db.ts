@@ -29,6 +29,8 @@ const migrate = Effect.gen(function* () {
     summary TEXT,
     image TEXT,
     published TEXT,
+    categories TEXT NOT NULL DEFAULT '[]',
+    author TEXT,
     read INTEGER NOT NULL DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`)
@@ -67,6 +69,14 @@ const migrate = Effect.gen(function* () {
     yield* sqlClient.unsafe(`ALTER TABLE articles ADD COLUMN processed INTEGER NOT NULL DEFAULT 0`)
     yield* sqlClient.unsafe(`UPDATE articles SET processed = 1 WHERE read = 1`)
   }
+
+  if (!hasCol('categories')) {
+    yield* sqlClient.unsafe(`ALTER TABLE articles ADD COLUMN categories TEXT NOT NULL DEFAULT '[]'`)
+  }
+
+  if (!hasCol('author')) {
+    yield* sqlClient.unsafe(`ALTER TABLE articles ADD COLUMN author TEXT`)
+  }
 })
 
 const DbLive = Layer.effect(
@@ -94,6 +104,8 @@ export interface ArticleRow {
   summary: string | null
   image: string | null
   published: string | null
+  categories: string[]
+  author: string | null
   read: number
 }
 
@@ -114,6 +126,16 @@ export interface CachedVideo {
 }
 
 export type ReadFilter = 'all' | 'unread' | 'read'
+
+function parseCategories(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
 
 export function listFeeds(): Promise<FeedRow[]> {
   return runtime.runPromise(
@@ -214,6 +236,8 @@ export function saveArticles(rows: ArticleRow[]): Promise<void> {
         summary: a.summary,
         image: a.image,
         published: a.published,
+        categories: JSON.stringify(a.categories),
+        author: a.author,
         read: a.read,
       }))
       yield* db.insert(articles).values(values).onConflictDoNothing()
@@ -225,7 +249,7 @@ export function getUnreadArticles(): Promise<ArticleRow[]> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      return yield* db
+      const rows = yield* db
         .select({
           id: articles.id,
           feedUrl: articles.feedUrl,
@@ -235,11 +259,14 @@ export function getUnreadArticles(): Promise<ArticleRow[]> {
           summary: articles.summary,
           image: articles.image,
           published: articles.published,
+          categories: articles.categories,
+          author: articles.author,
           read: articles.read,
         })
         .from(articles)
         .where(eq(articles.read, 0))
         .orderBy(desc(articles.published), desc(articles.createdAt))
+      return rows.map((r) => ({ ...r, categories: parseCategories(r.categories) }))
     }),
   )
 }
@@ -277,7 +304,7 @@ export function getUnprocessedArticles(): Promise<ArticleRow[]> {
   return runtime.runPromise(
     Effect.gen(function* () {
       const db = yield* SqliteDrizzle.SqliteDrizzle
-      return yield* db
+      const rows = yield* db
         .select({
           id: articles.id,
           feedUrl: articles.feedUrl,
@@ -287,11 +314,14 @@ export function getUnprocessedArticles(): Promise<ArticleRow[]> {
           summary: articles.summary,
           image: articles.image,
           published: articles.published,
+          categories: articles.categories,
+          author: articles.author,
           read: articles.read,
         })
         .from(articles)
         .where(eq(articles.processed, 0))
         .orderBy(desc(articles.published), desc(articles.createdAt))
+      return rows.map((r) => ({ ...r, categories: parseCategories(r.categories) }))
     }),
   )
 }
@@ -356,6 +386,8 @@ export function getRecentArticles(
           summary: articles.summary,
           image: articles.image,
           published: articles.published,
+          categories: articles.categories,
+          author: articles.author,
           read: articles.read,
           tracksJson,
         })
@@ -373,6 +405,8 @@ export function getRecentArticles(
         summary: r.summary,
         image: r.image,
         published: r.published,
+        categories: parseCategories(r.categories),
+        author: r.author,
         read: r.read,
         tracks: JSON.parse(r.tracksJson) as CachedTrack[],
       }))

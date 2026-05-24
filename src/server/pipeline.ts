@@ -102,6 +102,8 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
           summary: i.summary,
           image: i.image,
           published: i.published,
+          categories: i.categories,
+          author: i.author,
           read: 0,
         })),
       )

@@ -123,6 +123,8 @@ describe('fetchFeedEffect', () => {
         summary: 'snip',
         image: 'https://x.com/cover.jpg',
         published: '2026-05-18T00:00:00.000Z',
+        categories: [],
+        author: null,
       },
     ])
   })
@@ -133,6 +135,34 @@ describe('fetchFeedEffect', () => {
       fetchFeedEffect('https://x.com/feed').pipe(Effect.provide(layer)),
     )
     expect(result.feedTitle).toBe('https://x.com/feed')
+  })
+
+  it('maps dc:creator (item.creator) to author; null when missing', async () => {
+    const layer = parserLayer({
+      f: {
+        items: [
+          item({ guid: 'with-author', creator: 'Margaret Farrell' }),
+          item({ guid: 'no-author' }),
+        ],
+      },
+    })
+    const result = await Effect.runPromise(fetchFeedEffect('f').pipe(Effect.provide(layer)))
+    expect(result.items[0].author).toBe('Margaret Farrell')
+    expect(result.items[1].author).toBeNull()
+  })
+
+  it('maps item.categories through; defaults to [] when missing', async () => {
+    const layer = parserLayer({
+      f: {
+        items: [
+          item({ guid: 'with-cats', categories: ['New Music', 'Josh Conway'] }),
+          item({ guid: 'no-cats' }),
+        ],
+      },
+    })
+    const result = await Effect.runPromise(fetchFeedEffect('f').pipe(Effect.provide(layer)))
+    expect(result.items[0].categories).toEqual(['New Music', 'Josh Conway'])
+    expect(result.items[1].categories).toEqual([])
   })
 
   it('converts pubDate to ISO when isoDate missing', async () => {

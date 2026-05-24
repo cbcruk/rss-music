@@ -19,6 +19,8 @@ export const articles = sqliteTable('articles', {
   summary: text('summary'),
   image: text('image'),
   published: text('published'),
+  categories: text('categories').notNull().default('[]'),
+  author: text('author'),
   read: integer('read').notNull().default(0),
   processed: integer('processed').notNull().default(0),
   createdAt: text('created_at')

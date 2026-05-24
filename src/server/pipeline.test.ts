@@ -64,6 +64,8 @@ function rssItem(overrides: Partial<RssItem> & { id: string }): RssItem {
     summary: null,
     image: null,
     published: null,
+    categories: [],
+    author: null,
     ...overrides,
   }
 }
@@ -77,6 +79,8 @@ function articleRow(overrides: Partial<ArticleRow> & { id: string }): ArticleRow
     summary: null,
     image: null,
     published: null,
+    categories: [],
+    author: null,
     read: 0,
     ...overrides,
   }

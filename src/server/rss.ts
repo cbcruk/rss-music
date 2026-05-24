@@ -10,6 +10,8 @@ export interface RssItem {
   summary: string | null
   image: string | null
   published: string | null
+  categories: string[]
+  author: string | null
 }
 
 export interface CustomItemFields {
@@ -108,6 +110,8 @@ export const fetchFeedEffect = (feedUrl: string) =>
       summary: item.contentSnippet ?? item.summary ?? null,
       image: pickImage(item),
       published: item.isoDate ?? (item.pubDate ? new Date(item.pubDate).toISOString() : null),
+      categories: item.categories ?? [],
+      author: item.creator ?? null,
     }))
     return { feedTitle, items }
   })

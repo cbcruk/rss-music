@@ -18,6 +18,8 @@ function article(overrides: Partial<ArticleRow> & { id: string }): ArticleRow {
     summary: null,
     image: null,
     published: null,
+    categories: [],
+    author: null,
     read: 0,
     ...overrides,
   }
