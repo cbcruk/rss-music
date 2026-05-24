@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { ExternalLink, Music, Newspaper, Play } from 'lucide-react'
 import type { ArticleWithTracks, CachedTrack } from '#/server/db'
+import { Badge } from '#/ui/badge'
 import { feedColorClass } from './app-sidebar/feed-color'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -144,6 +145,15 @@ function CardBody({
           >
             {a.summary}
           </p>
+        )}
+        {a.categories.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {a.categories.map((c, i) => (
+              <Badge key={`${c}-${i}`} variant="outline" className="text-[10px] tracking-wide">
+                {c}
+              </Badge>
+            ))}
+          </div>
         )}
       </div>
       {children}
