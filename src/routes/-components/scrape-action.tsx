@@ -1,4 +1,4 @@
-import { Loader2, RefreshCw } from 'lucide-react'
+import { CircleArrowDown, Loader2 } from 'lucide-react'
 import { Button } from '#/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '#/ui/tooltip'
 
@@ -16,13 +16,13 @@ export function ScrapeAction({ isPending, error, onRun }: ScrapeActionProps) {
       <TooltipTrigger
         render={
           <Button
-            size="icon-sm"
+            size="icon"
             variant="ghost"
             disabled={isPending}
             onClick={onRun}
             aria-label={label}
           >
-            {isPending ? <Loader2 className="animate-spin" /> : <RefreshCw />}
+            {isPending ? <Loader2 className="animate-spin" /> : <CircleArrowDown />}
           </Button>
         }
       />

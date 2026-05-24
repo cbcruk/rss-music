@@ -6,9 +6,9 @@ interface PaginationProps {
   total: number
 }
 
-const linkBase = 'px-3 py-1 rounded border text-sm'
+const linkBase = 'px-3 py-1 rounded-md border border-border text-sm hover:bg-muted/50'
 const linkDisabled =
-  'px-3 py-1 rounded border text-sm text-gray-300 border-gray-200 pointer-events-none'
+  'px-3 py-1 rounded-md border border-border text-sm text-muted-foreground/50 pointer-events-none'
 
 export function Pagination({ page, pageSize, total }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
@@ -24,7 +24,7 @@ export function Pagination({ page, pageSize, total }: PaginationProps) {
       >
         ← Prev
       </Link>
-      <span className="text-sm text-gray-500">
+      <span className="text-sm text-muted-foreground">
         Page {page} of {totalPages} ({total} total)
       </span>
       <Link

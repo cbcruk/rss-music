@@ -19,7 +19,7 @@ export function TrackCard({ track }: TrackCardProps) {
         href={`https://www.youtube.com/results?search_query=${encodeURIComponent(track.searchQuery)}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="block aspect-video rounded bg-gray-100 hover:bg-gray-200 p-2 text-xs text-gray-600"
+        className="block aspect-video rounded-md bg-muted p-2 text-xs text-muted-foreground hover:bg-muted/70"
         title={`Search YouTube: ${track.searchQuery}`}
       >
         🔍 {track.searchQuery}

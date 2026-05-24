@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
 import { useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
+import { Check, Loader2 } from 'lucide-react'
 import { Button } from '#/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '#/ui/tooltip'
 
 const markAllAsRead = createServerFn({ method: 'POST' }).handler(async () => {
   const { markAllRead } = await import('#/server/db')
@@ -23,11 +25,24 @@ export function MarkAllReadButton({ unreadCount }: MarkAllReadButtonProps) {
 
   if (unreadCount === 0) return null
 
+  const label = mutation.isPending ? 'Marking…' : `Mark all ${unreadCount} read`
+
   return (
-    <div className="mb-4">
-      <Button variant="secondary" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
-        {mutation.isPending ? 'Marking…' : `Mark all ${unreadCount} read`}
-      </Button>
-    </div>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            size="icon"
+            variant="ghost"
+            disabled={mutation.isPending}
+            onClick={() => mutation.mutate()}
+            aria-label={label}
+          >
+            {mutation.isPending ? <Loader2 className="animate-spin" /> : <Check />}
+          </Button>
+        }
+      />
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
   )
 }

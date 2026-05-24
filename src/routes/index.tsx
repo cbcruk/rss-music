@@ -30,7 +30,8 @@ function Home() {
   return (
     <>
       <SiteHeader
-        title={`Unread (${data.unreadCount})`}
+        title="Unread"
+        count={data.unreadCount}
         actions={
           <>
             <MarkAllReadButton unreadCount={data.unreadCount} />

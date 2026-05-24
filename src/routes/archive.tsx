@@ -41,7 +41,7 @@ function Archive() {
 
   return (
     <>
-      <SiteHeader title={`Archive (${data.total})`} />
+      <SiteHeader title="Archive" count={data.total} />
       <div className="p-6">
         {data.articles.length === 0 ? (
           <Empty>

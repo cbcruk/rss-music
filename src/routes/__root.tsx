@@ -3,6 +3,7 @@ import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+import { createServerFn } from '@tanstack/react-start'
 import { SidebarInset, SidebarProvider } from '#/ui/sidebar'
 import { TooltipProvider } from '#/ui/tooltip'
 import { AppSidebar } from './-components/app-sidebar/app-sidebar'
@@ -11,6 +12,14 @@ import appCss from '../styles.css?url'
 interface RouterContext {
   queryClient: QueryClient
 }
+
+const fetchSidebarData = createServerFn({ method: 'GET' }).handler(async () => {
+  const { listFeeds, getArticleCount } = await import('#/server/db')
+  const [feeds, unreadCount] = await Promise.all([listFeeds(), getArticleCount('unread')])
+  return { feeds, unreadCount }
+})
+
+const themeInitScript = `try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}`
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   head: () => ({
@@ -33,15 +42,17 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       },
     ],
   }),
+  loader: () => fetchSidebarData(),
   shellComponent: RootDocument,
   component: AppLayout,
 })
 
 function AppLayout() {
+  const { feeds, unreadCount } = Route.useLoaderData()
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar feeds={feeds} unreadCount={unreadCount} />
         <SidebarInset>
           <Outlet />
         </SidebarInset>
@@ -53,9 +64,10 @@ function AppLayout() {
 function RootDocument({ children }: { children: React.ReactNode }) {
   const { queryClient } = Route.useRouteContext()
   return (
-    <html lang="ko">
+    <html lang="ko" className="dark">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
         <QueryClientProvider client={queryClient}>
