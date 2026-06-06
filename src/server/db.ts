@@ -3,12 +3,10 @@ import { SqliteClient } from '@effect/sql-sqlite-node'
 import * as SqliteDrizzle from '@effect/sql-drizzle/Sqlite'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
 import { Effect, Layer, ManagedRuntime } from 'effect'
-import { dirname, join } from 'path'
-import { fileURLToPath } from 'url'
+import { join } from 'path'
 import { articles, feeds, youtubeCache } from './schema.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const DB_PATH = process.env.RSS_DB_PATH ?? join(__dirname, '..', '..', 'data', 'cache.db')
+const DB_PATH = process.env.RSS_DB_PATH ?? join(process.cwd(), 'data', 'cache.db')
 
 const migrate = Effect.gen(function* () {
   const sqlClient = yield* SqlClient.SqlClient
