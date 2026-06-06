@@ -11,6 +11,7 @@ import {
 } from './db.js'
 import { generateTracks, type TrackInput } from './gemini.js'
 import { fetchFeeds } from './rss.js'
+import { appendScrapeLog, newestPublished } from './scrape-log.js'
 import { searchYouTube } from './youtube.js'
 
 export interface TrackWithVideo extends TrackInput {
@@ -54,6 +55,8 @@ function stage(s: PipelineStage, message: string): PipelineEvent {
  * read 상태는 사용자 액션 전용이므로 pipeline은 건드리지 않는다.
  * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다. */
 export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResult> {
+  const startedAt = Date.now()
+  const runId = new Date(startedAt).toISOString()
   const stats: PipelineStats = {
     feeds: 0,
     feedErrors: 0,
@@ -64,6 +67,20 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
     youtubeApiCalls: 0,
     processed: 0,
   }
+
+  const logRun = (): Promise<void> =>
+    appendScrapeLog({
+      type: 'run',
+      runId,
+      durationMs: Date.now() - startedAt,
+      feeds: stats.feeds,
+      feedErrors: stats.feedErrors,
+      newArticles: stats.newArticles,
+      processed: stats.processed,
+      trackCount: stats.trackCount,
+      cacheHits: stats.cacheHits,
+      youtubeApiCalls: stats.youtubeApiCalls,
+    })
 
   // Stage 1: feeds
   yield stage('feeds', 'Loading feeds...')
@@ -82,6 +99,17 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
     if (result.error) {
       yield log(`✗ ${result.feedUrl}: ${result.error}`, 'warn')
       stats.feedErrors++
+      await appendScrapeLog({
+        type: 'feed',
+        runId,
+        feedUrl: result.feedUrl,
+        feedTitle: result.feedTitle,
+        ok: false,
+        itemCount: 0,
+        newCount: 0,
+        newestPublished: null,
+        error: result.error,
+      })
       continue
     }
     if (result.feedTitle) {
@@ -109,6 +137,18 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
       )
       stats.newArticles += fresh.length
     }
+
+    await appendScrapeLog({
+      type: 'feed',
+      runId,
+      feedUrl: result.feedUrl,
+      feedTitle: result.feedTitle,
+      ok: true,
+      itemCount: result.items.length,
+      newCount: fresh.length,
+      newestPublished: newestPublished(result.items),
+      error: null,
+    })
   }
   yield log(
     `RSS: ${fetchResults.length} feeds (${stats.feedErrors} errors), ${stats.newArticles} new articles.`,
@@ -116,6 +156,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   const queue = await getUnprocessedArticles()
   if (queue.length === 0) {
+    await logRun()
     yield stage('done', 'No unprocessed articles.')
     return { tracks: [], stats }
   }
@@ -170,6 +211,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
   stats.processed = await markArticlesProcessed(articleIds)
   yield stage('mark-processed', `Marked ${stats.processed} articles as processed.`)
 
+  await logRun()
   yield stage('done', 'Pipeline complete.')
   return { tracks: trackResults, stats }
 }
