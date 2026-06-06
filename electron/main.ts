@@ -1,4 +1,13 @@
-import { app, BrowserWindow, Tray, Menu, Notification, nativeImage } from 'electron'
+import {
+  app,
+  BrowserWindow,
+  Tray,
+  Menu,
+  Notification,
+  nativeImage,
+  powerSaveBlocker,
+  powerMonitor,
+} from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { connect } from 'node:net'
 import { createWriteStream } from 'node:fs'
@@ -158,6 +167,9 @@ void app.whenReady().then(async () => {
   if (app.isPackaged) {
     app.setLoginItemSettings({ openAtLogin: true })
   }
+
+  powerSaveBlocker.start('prevent-app-suspension')
+  powerMonitor.on('resume', () => runScrape(false))
 
   const ready = await ensureServer()
   createTray()
