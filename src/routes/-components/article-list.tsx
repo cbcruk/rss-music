@@ -1,8 +1,10 @@
 import { useState, type ReactNode } from 'react'
-import { ExternalLink, Music, Newspaper, Play } from 'lucide-react'
+import { ExternalLink, MoreHorizontal, Music, Newspaper, Play } from 'lucide-react'
 import type { ArticleWithTracks, CachedTrack } from '#/server/db'
 import { Badge } from '#/ui/badge'
+import { Popover, PopoverContent, PopoverTrigger } from '#/ui/popover'
 import { feedColorClass } from './app-sidebar/feed-color'
+import { DownloadButton } from './download-button'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -117,6 +119,7 @@ function CardBody({
   variant: Variant
   children: ReactNode
 }) {
+  const videoId = a.tracks.find((t) => t.videoId)?.videoId
   return (
     <div className="flex justify-between gap-4 min-w-0 flex-1">
       <div className="flex flex-col">
@@ -127,15 +130,32 @@ function CardBody({
           }`}
         >
           {a.title}
-          <a
-            href={a.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Open article"
-            className="ml-1.5 inline-flex align-middle text-muted-foreground hover:text-foreground"
-          >
-            <ExternalLink className="size-3.5" />
-          </a>
+          <Popover>
+            <PopoverTrigger
+              aria-label="Actions"
+              className="ml-1.5 inline-flex align-middle text-muted-foreground hover:text-foreground"
+            >
+              <MoreHorizontal className="size-3.5" />
+            </PopoverTrigger>
+            <PopoverContent className="min-w-44">
+              <a
+                href={a.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                <ExternalLink className="size-4" />
+                Open article
+              </a>
+              {videoId && (
+                <DownloadButton
+                  videoId={videoId}
+                  showLabel
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+                />
+              )}
+            </PopoverContent>
+          </Popover>
         </h2>
         {a.summary && (
           <p

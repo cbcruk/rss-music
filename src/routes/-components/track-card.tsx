@@ -27,37 +27,41 @@ export function TrackCard({ track }: TrackCardProps) {
     )
   }
 
-  if (playing) {
-    return (
-      <div className="aspect-video rounded overflow-hidden bg-black col-span-full">
+  const videoId = track.videoId
+
+  return (
+    <div
+      className={`group relative aspect-video rounded overflow-hidden bg-black ${
+        playing ? 'col-span-full' : ''
+      }`}
+    >
+      {playing ? (
         <iframe
-          src={`https://www.youtube.com/embed/${track.videoId}?autoplay=1`}
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
           title={track.videoTitle ?? track.searchQuery}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen
           className="w-full h-full border-0"
         />
-      </div>
-    )
-  }
-
-  return (
-    <button
-      onClick={() => setPlaying(true)}
-      className="group relative aspect-video rounded overflow-hidden bg-black text-left"
-      title={track.videoTitle ?? track.searchQuery}
-    >
-      <img
-        src={`https://i.ytimg.com/vi/${track.videoId}/mqdefault.jpg`}
-        alt={track.videoTitle ?? ''}
-        className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
-      />
-      <span className="absolute inset-0 flex items-center justify-center text-white text-3xl drop-shadow-lg">
-        ▶
-      </span>
-      <span className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-1 text-xs text-white line-clamp-1">
-        {track.videoTitle ?? track.searchQuery}
-      </span>
-    </button>
+      ) : (
+        <button
+          onClick={() => setPlaying(true)}
+          className="block w-full h-full text-left"
+          title={track.videoTitle ?? track.searchQuery}
+        >
+          <img
+            src={`https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`}
+            alt={track.videoTitle ?? ''}
+            className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition"
+          />
+          <span className="absolute inset-0 flex items-center justify-center text-white text-3xl drop-shadow-lg">
+            ▶
+          </span>
+          <span className="absolute bottom-0 left-0 right-0 bg-linear-to-t from-black/80 to-transparent p-1 text-xs text-white line-clamp-1">
+            {track.videoTitle ?? track.searchQuery}
+          </span>
+        </button>
+      )}
+    </div>
   )
 }
