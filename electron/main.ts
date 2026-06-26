@@ -88,6 +88,14 @@ function summarize(line: string): string {
   return idx >= 0 ? line.slice(idx + 2) : line
 }
 
+function youtubeWatchUrl(url: string | undefined): string | null {
+  if (!url) return null
+  const match = url.match(
+    /(?:youtube(?:-nocookie)?\.com\/embed\/|youtube\.com\/watch\?v=|youtu\.be\/|ytimg\.com\/vi\/)([\w-]{11})/,
+  )
+  return match ? `https://www.youtube.com/watch?v=${match[1]}` : null
+}
+
 function runScrape(manual: boolean): void {
   if (scrapeProcess) {
     if (manual) notify('Scrape', 'A scrape is already running.')
@@ -139,6 +147,15 @@ function createWindow(): void {
 
   win.webContents.on('context-menu', (_event, params) => {
     const template: Electron.MenuItemConstructorOptions[] = []
+
+    const videoUrl = youtubeWatchUrl(params.frameURL) ?? youtubeWatchUrl(params.srcURL)
+    if (videoUrl) {
+      template.push(
+        { label: 'Copy Video URL', click: () => clipboard.writeText(videoUrl) },
+        { label: 'Open Video in Browser', click: () => void shell.openExternal(videoUrl) },
+        { type: 'separator' },
+      )
+    }
 
     if (params.linkURL) {
       template.push(
