@@ -12,10 +12,6 @@ dist-ssr
 .output
 .vinxi
 
-# Electron
-dist-electron
-release
-
 # Misc
 output.html
 tmp-queries.json

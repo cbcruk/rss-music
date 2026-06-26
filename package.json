@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "main": "dist-electron/main.cjs",
   "imports": {
     "#/*": "./src/*"
   },
@@ -11,12 +10,8 @@
     "dev": "vp dev --port 3333",
     "build": "vp build",
     "build:scrape": "esbuild src/server/scrape-cli.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/scrape.mjs",
-    "build:electron": "esbuild electron/main.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/main.cjs && cp electron/tray-icon.png dist-electron/tray-icon.png",
     "scrape": "node --env-file=.env dist/scrape.mjs",
     "start": "vp preview --port 3333",
-    "app:build": "vp build && pnpm build:scrape && pnpm build:electron",
-    "app": "env -u ELECTRON_RUN_AS_NODE electron .",
-    "app:dist": "pnpm app:build && env -u ELECTRON_RUN_AS_NODE electron-builder --mac && codesign --force --deep --sign - 'release/mac-arm64/RSS Extensions.app'",
     "prepare": "vp config"
   },
   "dependencies": {
@@ -58,8 +53,6 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
-    "electron": "^42.3.3",
-    "electron-builder": "^26.8.1",
     "esbuild": "^0.28.0",
     "typescript": "^6.0.2",
     "vite": "npm:@voidzero-dev/vite-plus-core@latest",
@@ -71,8 +64,7 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "lightningcss",
-      "better-sqlite3",
-      "electron"
+      "better-sqlite3"
     ],
     "overrides": {
       "vite": "npm:@voidzero-dev/vite-plus-core@latest",
@@ -87,23 +79,6 @@
         "vite": "*",
         "vitest": "*"
       }
-    }
-  },
-  "build": {
-    "appId": "com.eunsoo.rss-extensions",
-    "productName": "RSS Extensions",
-    "asar": true,
-    "npmRebuild": false,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist-electron/**/*",
-      "package.json"
-    ],
-    "mac": {
-      "target": "dir",
-      "identity": null
     }
   }
 }

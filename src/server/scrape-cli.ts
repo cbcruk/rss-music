@@ -1,7 +1,13 @@
+import { execFile } from 'node:child_process'
 import { runPipeline, type PipelineResult } from './pipeline.js'
 
 function ts(): string {
   return new Date().toISOString()
+}
+
+function notify(title: string, message: string): void {
+  const script = `display notification ${JSON.stringify(message)} with title ${JSON.stringify(title)}`
+  execFile('/usr/bin/osascript', ['-e', script], () => {})
 }
 
 async function main(): Promise<void> {
@@ -30,6 +36,9 @@ async function main(): Promise<void> {
     `[${ts()}] scrape: done in ${elapsed}s — ${s.newArticles} new, ${s.processed} processed, ` +
       `${s.trackCount} tracks, ${s.feedErrors} feed errors, ${s.youtubeApiCalls} yt calls`,
   )
+  if (s.newArticles > 0) {
+    notify('rss-music', `${s.newArticles} new ${s.newArticles === 1 ? 'article' : 'articles'}`)
+  }
   process.exit(0)
 }
 
