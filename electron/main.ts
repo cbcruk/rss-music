@@ -7,6 +7,8 @@ import {
   nativeImage,
   powerSaveBlocker,
   powerMonitor,
+  shell,
+  clipboard,
 } from 'electron'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { connect } from 'node:net'
@@ -126,17 +128,62 @@ function showWindow(): void {
 }
 
 function createWindow(): void {
-  mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: 1280,
     height: 860,
     title: 'rss-extensions',
     webPreferences: { contextIsolation: true },
   })
-  void mainWindow.loadURL(APP_URL)
-  mainWindow.on('close', (event) => {
+  mainWindow = win
+  void win.loadURL(APP_URL)
+
+  win.webContents.on('context-menu', (_event, params) => {
+    const template: Electron.MenuItemConstructorOptions[] = []
+
+    if (params.linkURL) {
+      template.push(
+        { label: 'Open Link in Browser', click: () => void shell.openExternal(params.linkURL) },
+        { label: 'Copy Link Address', click: () => clipboard.writeText(params.linkURL) },
+        { type: 'separator' },
+      )
+    }
+
+    if (params.isEditable) {
+      template.push(
+        { role: 'cut', enabled: params.editFlags.canCut },
+        { role: 'copy', enabled: params.editFlags.canCopy },
+        { role: 'paste', enabled: params.editFlags.canPaste },
+        { type: 'separator' },
+        { role: 'selectAll' },
+      )
+    } else if (params.selectionText) {
+      template.push({ role: 'copy' }, { type: 'separator' }, { role: 'selectAll' })
+    }
+
+    if (template.length > 0) template.push({ type: 'separator' })
+    template.push(
+      {
+        label: 'Back',
+        enabled: win.webContents.navigationHistory.canGoBack(),
+        click: () => win.webContents.navigationHistory.goBack(),
+      },
+      {
+        label: 'Forward',
+        enabled: win.webContents.navigationHistory.canGoForward(),
+        click: () => win.webContents.navigationHistory.goForward(),
+      },
+      { role: 'reload' },
+      { type: 'separator' },
+      { label: 'Inspect Element', click: () => win.webContents.inspectElement(params.x, params.y) },
+    )
+
+    Menu.buildFromTemplate(template).popup({ window: win })
+  })
+
+  win.on('close', (event) => {
     if (!isQuitting) {
       event.preventDefault()
-      mainWindow?.hide()
+      win.hide()
     }
   })
 }
