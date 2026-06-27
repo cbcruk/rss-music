@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { ExternalLink, MoreHorizontal, Music, Newspaper, Play } from 'lucide-react'
+import { ExternalLink, MoreHorizontal, Music, Newspaper, Play, Search } from 'lucide-react'
 import type { ArticleWithTracks, CachedTrack } from '#/server/db'
 import { Badge } from '#/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '#/ui/popover'
@@ -13,6 +13,16 @@ function formatDate(iso: string | null): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
   return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
+}
+
+/** Strips quotes, dashes and `::` that confuse Spotify's search
+ * (e.g. `Boy Harsher – “Jeans”` → `Boy Harsher Jeans`, `Artist :: Title` → `Artist Title`). */
+function spotifyQuery(title: string): string {
+  return title
+    .replace(/[‘’“”"']/g, '')
+    .replace(/[–—:]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 type Variant = 'featured' | 'standard' | 'compact'
@@ -146,6 +156,13 @@ function CardBody({
               >
                 <ExternalLink className="size-4" />
                 Open article
+              </a>
+              <a
+                href={`spotify:search:${encodeURIComponent(spotifyQuery(a.title))}`}
+                className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground"
+              >
+                <Search className="size-4" />
+                Search on Spotify
               </a>
               {videoId && (
                 <DownloadButton
