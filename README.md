@@ -85,6 +85,20 @@ launchctl bootout  gui/$(id -u) ~/Library/LaunchAgents/com.eunsoo.rss-music.serv
 
 ---
 
+## 메뉴바 (SwiftBar)
+
+[SwiftBar](https://github.com/swiftbar/SwiftBar) 플러그인으로 메뉴바에 상태 + 빠른 액션을 띄웁니다 (`swiftbar/rss-music.1m.sh`, 1분 갱신). 서버 up/down, 마지막 스크랩(+새 글), 안 읽음 수를 보여주고 **열기 / 지금 스크랩 / 서버 재시작 / 로그**를 메뉴에서 바로 실행합니다.
+
+```bash
+brew install --cask swiftbar
+defaults write com.ameba.SwiftBar PluginDirectory -string "$PWD/swiftbar"
+open -a SwiftBar
+```
+
+> SwiftBar가 플러그인 폴더 접근을 물으면 repo의 `swiftbar/`를 선택하세요. plugin은 `launchctl`/`sqlite3`/`curl`을 호출하므로 절대경로가 박혀 있습니다(다른 머신이면 `swiftbar/rss-music.1m.sh` 상단 변수 수정).
+
+---
+
 ## 다운로드 (yt-dlp)
 
 기사 제목 옆 **⋯ → Download** 에서 `yt-dlp -S height:720`으로 `~/Downloads`에 저장합니다. 서버 함수가 로컬에서 yt-dlp를 실행하며(`/opt/homebrew/bin` 절대경로 + PATH 보강), 다운로드 이력은 `data/download.log`에 남습니다. `yt-dlp`·`ffmpeg`가 설치돼 있어야 합니다.
