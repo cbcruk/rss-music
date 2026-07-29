@@ -17,6 +17,11 @@ function hash(s: string): number {
   return Math.abs(h)
 }
 
+/**
+ * 피드 URL을 고정 팔레트의 색 하나에 대응시킨다. 해시 기반이라 같은 피드는 항상 같은 색이고,
+ * 색 정보를 따로 저장할 필요가 없다.
+ * @returns Tailwind 배경색 클래스 (예: `'bg-[#5b8dd9]'`)
+ */
 export function feedColorClass(url: string): string {
   return PALETTE[hash(url) % PALETTE.length]!
 }

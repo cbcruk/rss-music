@@ -10,6 +10,7 @@ const linkBase = 'px-3 py-1 rounded-md border border-border text-sm hover:bg-mut
 const linkDisabled =
   'px-3 py-1 rounded-md border border-border text-sm text-muted-foreground/50 pointer-events-none'
 
+/** `/archive` 전용 이전/다음 페이지 내비게이션. 양 끝에서는 링크를 비활성화한다. */
 export function Pagination({ page, pageSize, total }: PaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const isFirst = page <= 1

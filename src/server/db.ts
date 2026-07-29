@@ -87,12 +87,18 @@ const DbLive = Layer.effect(
 
 const runtime = ManagedRuntime.make(DbLive)
 
+/** `feeds` 테이블 행 중 앱이 읽는 컬럼. */
 export interface FeedRow {
   url: string
   title: string | null
   lastFetchedAt: string | null
 }
 
+/**
+ * `articles` 테이블 행. `categories`는 DB에 JSON 문자열로 저장되지만 여기서는 파싱된 배열이다.
+ * `read`(사용자가 읽음 처리)와 `processed`(파이프라인이 처리 완료)는 별개 개념이라
+ * 이 타입에는 사용자 관점의 `read`만 노출한다.
+ */
 export interface ArticleRow {
   id: string
   feedUrl: string
@@ -107,10 +113,12 @@ export interface ArticleRow {
   read: number
 }
 
+/** 기사 + 그 기사에서 뽑힌 트랙들. 목록 화면이 쓰는 형태. */
 export interface ArticleWithTracks extends ArticleRow {
   tracks: CachedTrack[]
 }
 
+/** `youtube_cache` 테이블 행. 검색어별 YouTube 매칭 결과를 캐싱한다. */
 export interface CachedTrack {
   articleId: string
   searchQuery: string
@@ -118,11 +126,13 @@ export interface CachedTrack {
   videoTitle: string | null
 }
 
+/** 매칭된 영상 정보. 검색 결과가 없으면 두 필드 모두 `null`. */
 export interface CachedVideo {
   videoId: string | null
   videoTitle: string | null
 }
 
+/** 기사 목록 조회 시 읽음 상태 필터. */
 export type ReadFilter = 'all' | 'unread' | 'read'
 
 function parseCategories(raw: string | null): string[] {
@@ -135,6 +145,7 @@ function parseCategories(raw: string | null): string[] {
   }
 }
 
+/** 등록된 피드를 제목 기준(대소문자 무시) 오름차순으로 반환한다. */
 export function listFeeds(): Promise<FeedRow[]> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -151,6 +162,10 @@ export function listFeeds(): Promise<FeedRow[]> {
   )
 }
 
+/**
+ * 피드를 등록하거나 제목을 갱신한다.
+ * @param title `null`이면 기존 제목을 지우지 않고 그대로 둔다.
+ */
 export function upsertFeed(url: string, title: string | null): Promise<void> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -166,6 +181,10 @@ export function upsertFeed(url: string, title: string | null): Promise<void> {
   )
 }
 
+/**
+ * 피드를 삭제한다. 해당 피드로 수집된 기사는 남는다.
+ * @returns 실제로 지워진 행 수 (0 또는 1)
+ */
 export function removeFeed(url: string): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -180,6 +199,7 @@ export function removeFeed(url: string): Promise<number> {
   )
 }
 
+/** 피드의 `lastFetchedAt`을 현재 시각으로 갱신한다. */
 export function touchFeed(url: string): Promise<void> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -192,6 +212,7 @@ export function touchFeed(url: string): Promise<void> {
   )
 }
 
+/** 기사 1건의 존재 여부. 여러 건을 한 번에 확인할 땐 {@link getExistingArticleIds}를 쓴다. */
 export function hasArticle(id: string): Promise<boolean> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -206,6 +227,10 @@ export function hasArticle(id: string): Promise<boolean> {
   )
 }
 
+/**
+ * 주어진 id 중 이미 저장된 것만 골라낸다. 신규 기사 판별에 쓰는 벌크 조회.
+ * @returns 존재하는 id 집합. 입력이 비면 빈 Set
+ */
 export function getExistingArticleIds(ids: string[]): Promise<Set<string>> {
   if (ids.length === 0) return Promise.resolve(new Set())
   return runtime.runPromise(
@@ -220,6 +245,10 @@ export function getExistingArticleIds(ids: string[]): Promise<Set<string>> {
   )
 }
 
+/**
+ * 기사를 일괄 저장한다. id가 겹치면 기존 행을 건드리지 않고 건너뛰므로(`ON CONFLICT DO NOTHING`)
+ * 이미 읽은 기사가 되살아나지 않는다.
+ */
 export function saveArticles(rows: ArticleRow[]): Promise<void> {
   if (rows.length === 0) return Promise.resolve()
   return runtime.runPromise(
@@ -243,6 +272,7 @@ export function saveArticles(rows: ArticleRow[]): Promise<void> {
   )
 }
 
+/** 읽지 않은(`read = 0`) 기사를 발행일 최신순으로 반환한다. */
 export function getUnreadArticles(): Promise<ArticleRow[]> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -269,6 +299,10 @@ export function getUnreadArticles(): Promise<ArticleRow[]> {
   )
 }
 
+/**
+ * 기사들을 읽음 처리한다.
+ * @returns 이번 호출로 실제 상태가 바뀐 기사 수 (이미 읽음이던 건 제외)
+ */
 export function markArticlesRead(ids: string[]): Promise<number> {
   if (ids.length === 0) return Promise.resolve(0)
   return runtime.runPromise(
@@ -284,6 +318,10 @@ export function markArticlesRead(ids: string[]): Promise<number> {
   )
 }
 
+/**
+ * 안 읽은 기사를 모두 읽음 처리한다.
+ * @returns 이번 호출로 상태가 바뀐 기사 수
+ */
 export function markAllRead(): Promise<number> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -298,6 +336,10 @@ export function markAllRead(): Promise<number> {
   )
 }
 
+/**
+ * 파이프라인이 아직 처리하지 않은(`processed = 0`) 기사를 발행일 최신순으로 반환한다.
+ * 사용자 읽음 상태(`read`)와는 무관하다.
+ */
 export function getUnprocessedArticles(): Promise<ArticleRow[]> {
   return runtime.runPromise(
     Effect.gen(function* () {
@@ -324,6 +366,10 @@ export function getUnprocessedArticles(): Promise<ArticleRow[]> {
   )
 }
 
+/**
+ * 기사들을 처리 완료로 표시해 다음 실행에서 다시 큐에 들어오지 않게 한다.
+ * @returns 이번 호출로 상태가 바뀐 기사 수
+ */
 export function markArticlesProcessed(ids: string[]): Promise<number> {
   if (ids.length === 0) return Promise.resolve(0)
   return runtime.runPromise(
@@ -351,6 +397,11 @@ function readWhere(filter: ReadFilter) {
   return undefined
 }
 
+/**
+ * 기사 목록을 트랙까지 한 번에 조회한다(서브쿼리 JSON 집계라 N+1이 없다).
+ * 정렬은 발행일, 없으면 수집일 기준 내림차순.
+ * @param opts `limit` 기본 100, `offset` 기본 0, `readFilter` 기본 `'all'`
+ */
 export function getRecentArticles(
   opts: GetRecentArticlesOptions = {},
 ): Promise<ArticleWithTracks[]> {
@@ -412,6 +463,7 @@ export function getRecentArticles(
   )
 }
 
+/** 필터 조건에 맞는 기사 총 개수. 페이지네이션에 쓴다. */
 export function getArticleCount(readFilter: ReadFilter = 'all'): Promise<number> {
   const where = readWhere(readFilter)
   return runtime.runPromise(
@@ -453,6 +505,10 @@ export function getTrackCache(articleIds: string[]): Promise<Map<string, CachedV
   )
 }
 
+/**
+ * 검색어별 YouTube 매칭 결과를 저장한다. 같은 `(articleId, searchQuery)`면 덮어쓴다.
+ * 검색 결과가 없었다는 사실도 `null`로 캐싱해 재조회를 막는다.
+ */
 export function cacheVideo(
   articleId: string,
   searchQuery: string,

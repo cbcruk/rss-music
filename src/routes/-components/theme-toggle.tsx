@@ -10,6 +10,10 @@ function readStoredTheme(): Theme {
   return window.localStorage.getItem('theme') === 'light' ? 'light' : 'dark'
 }
 
+/**
+ * 다크/라이트 테마 토글. 선택은 localStorage에 저장한다.
+ * hydration 불일치를 피하려고 첫 렌더는 항상 dark로 그린 뒤 effect에서 실제 값으로 맞춘다.
+ */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('dark')
 

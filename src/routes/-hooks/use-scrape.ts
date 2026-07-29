@@ -3,6 +3,7 @@ import { useRouter } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 import type { PipelineEvent, PipelineStats } from '#/server/pipeline'
 
+/** 스크랩 1회의 최종 결과. `events`는 UI 표시용으로 평탄화된 로그. */
 export interface ScrapeResult {
   events: Array<{ kind: string; message: string }>
   stats: PipelineStats
@@ -81,6 +82,13 @@ function reducer(state: ScrapeState, action: ScrapeAction): ScrapeState {
 
 const initialState: ScrapeState = { status: 'idle' }
 
+/**
+ * 서버 파이프라인을 실행하고 진행 이벤트를 스트리밍으로 받아 상태로 누적한다.
+ * 완료되면 라우터를 invalidate해 기사 목록을 다시 불러온다.
+ *
+ * 중복 실행은 이전 요청을 abort하고 새로 시작하며, 언마운트 시에도 abort한다.
+ * @returns `run`(실행 트리거)과 현재 진행 상태 — `running` / `events` / `result` / `error`
+ */
 export function useScrape() {
   const router = useRouter()
   const [state, dispatch] = useReducer(reducer, initialState)

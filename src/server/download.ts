@@ -8,6 +8,7 @@ const EXTRA_PATH = '/opt/homebrew/bin'
 const DOWNLOAD_DIR = process.env.RSS_DOWNLOAD_DIR ?? join(homedir(), 'Downloads')
 const LOG_PATH = join(process.cwd(), 'data', 'download.log')
 
+/** yt-dlp 실행 결과. `output`은 마지막 4줄만 추린 로그 꼬리. */
 export interface DownloadResult {
   ok: boolean
   videoId: string
@@ -30,6 +31,13 @@ function logDownload(videoId: string, code: number | null, tail: string): void {
   }
 }
 
+/**
+ * yt-dlp로 영상을 720p 이하로 내려받는다. 저장 위치는 `RSS_DOWNLOAD_DIR`(기본 `~/Downloads`).
+ *
+ * `videoId`는 URL에 끼워 넣기 전에 `[A-Za-z0-9_-]{11}` 형식인지 검증한다 —
+ * 임의 문자열이 yt-dlp 인자로 흘러드는 걸 막는 장치이므로 완화하지 말 것.
+ * @returns 성공 여부와 로그 꼬리. 형식이 어긋나거나 실행이 실패해도 reject하지 않고 `ok: false`로 돌려준다
+ */
 export function downloadVideo(videoId: string): Promise<DownloadResult> {
   if (!/^[\w-]{11}$/.test(videoId)) {
     return Promise.resolve({ ok: false, videoId, output: 'Invalid video id.' })

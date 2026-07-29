@@ -2,16 +2,19 @@ import { readFileSync } from 'fs'
 import { XMLParser } from 'fast-xml-parser'
 import { Effect } from 'effect'
 
+/** OPML에서 추출한 피드 1건. `category`는 자신을 감싼 상위 outline의 이름. */
 export interface OpmlFeed {
   url: string
   title: string | null
   category: string | null
 }
 
+/** OPML 파일을 읽지 못했을 때(경로 오류, 권한 등). */
 export class OpmlReadError extends Error {
   readonly _tag = 'OpmlReadError'
 }
 
+/** OPML XML 파싱에 실패했을 때. */
 export class OpmlParseError extends Error {
   readonly _tag = 'OpmlParseError'
 }
@@ -75,6 +78,10 @@ const parseOpmlEffect = (filePath: string) =>
     return out
   })
 
+/**
+ * OPML 파일에서 피드 목록을 뽑아낸다. 중첩 outline을 재귀 순회하며 상위 폴더명을 카테고리로 물려준다.
+ * @returns `xmlUrl`을 가진 outline만 평탄화한 목록. body가 없으면 빈 배열
+ */
 export function parseOpml(filePath: string): Promise<OpmlFeed[]> {
   return Effect.runPromise(parseOpmlEffect(filePath))
 }
