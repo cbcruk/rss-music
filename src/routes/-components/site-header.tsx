@@ -8,6 +8,11 @@ interface SiteHeaderProps {
   actions?: React.ReactNode
 }
 
+/**
+ * 상단 고정 헤더. 사이드바 토글과 테마 토글은 항상 포함된다.
+ * @param count 넘기면 제목 옆에 기사 수 배지를 표시
+ * @param actions 테마 토글 왼쪽에 놓일 페이지별 액션 버튼
+ */
 export function SiteHeader({ title, count, actions }: SiteHeaderProps) {
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4">

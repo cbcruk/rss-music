@@ -14,6 +14,7 @@ interface MarkAllReadButtonProps {
   unreadCount: number
 }
 
+/** 안 읽은 기사를 모두 읽음 처리하는 버튼. 안 읽은 기사가 없으면 렌더링하지 않는다. */
 export function MarkAllReadButton({ unreadCount }: MarkAllReadButtonProps) {
   const router = useRouter()
   const mutation = useMutation({

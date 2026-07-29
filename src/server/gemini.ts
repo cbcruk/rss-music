@@ -3,6 +3,10 @@ import { GoogleGenAI, Type } from '@google/genai'
 import type { ArticleRow } from './db.js'
 import { retryByStatus } from './retry.js'
 
+/**
+ * Gemini가 기사 1건에서 뽑아낸 트랙 후보. 리스티클 기사는 여러 개가 같은 `articleId`를 공유한다.
+ * 음악과 무관한 기사는 `searchQuery`가 빈 문자열로 온다.
+ */
 export interface TrackInput {
   articleId: string
   searchQuery: string
@@ -42,11 +46,16 @@ const RESPONSE_SCHEMA = {
   },
 }
 
+/**
+ * Gemini SDK 인스턴스를 담는 서비스. 테스트에서는 가짜 `ai` 객체를 주입한다.
+ * @see {@link GeminiClientLive} 환경변수로 초기화하는 구현
+ */
 export class GeminiClient extends Context.Tag('GeminiClient')<
   GeminiClient,
   { readonly ai: GoogleGenAI }
 >() {}
 
+/** `GEMINI_API_KEY` 환경변수가 없을 때 Layer 구성 단계에서 실패한다. */
 export class MissingGeminiApiKeyError extends Error {
   readonly _tag = 'MissingGeminiApiKeyError'
   constructor() {
@@ -54,6 +63,7 @@ export class MissingGeminiApiKeyError extends Error {
   }
 }
 
+/** `GEMINI_API_KEY`로 {@link GeminiClient}를 구성한다. 키가 없으면 {@link MissingGeminiApiKeyError}. */
 export const GeminiClientLive = Layer.effect(
   GeminiClient,
   Effect.gen(function* () {
@@ -63,9 +73,11 @@ export const GeminiClientLive = Layer.effect(
   }),
 )
 
+/** Gemini API 호출 실패. `status`가 재시도 가능 여부를 가른다({@link isRetryable}). */
 export class GeminiApiError extends Error {
   readonly _tag = 'GeminiApiError'
   constructor(
+    /** HTTP 상태 코드. 네트워크 오류처럼 응답 자체가 없으면 `undefined`. */
     public readonly status: number | undefined,
     message: string,
   ) {
@@ -73,12 +85,14 @@ export class GeminiApiError extends Error {
   }
 }
 
+/** 응답 본문을 {@link TrackInput} 배열로 파싱하지 못했을 때. 재시도하지 않는다. */
 export class GeminiParseError extends Error {
   readonly _tag = 'GeminiParseError'
 }
 
 type GeminiError = GeminiApiError | GeminiParseError
 
+/** 배치 시작 시점에 알리는 진행 이벤트. `current`는 1부터 시작하는 배치 번호. */
 export type GeminiProgressEvent = {
   type: 'batch-start'
   current: number
@@ -86,8 +100,10 @@ export type GeminiProgressEvent = {
   size: number
 }
 
+/** {@link generateTracks}가 배치마다 호출하는 진행 콜백. */
 export type GeminiProgressCallback = (event: GeminiProgressEvent) => void
 
+/** 기사 목록을 프롬프트용 평문으로 직렬화한다. 기사 사이는 `---`로 구분. */
 export function formatArticles(articles: ArticleRow[]): string {
   return articles
     .map((a) => `articleId: ${a.id}\ntitle: ${a.title}\nsource: ${a.source}\nurl: ${a.url}`)
@@ -115,6 +131,10 @@ const callGemini = (articles: ArticleRow[]) =>
     })
   })
 
+/**
+ * 응답 본문을 {@link TrackInput} 배열로 파싱한다. 본문이 비어 있으면 빈 배열,
+ * JSON이 아니면 {@link GeminiParseError}로 실패한다.
+ */
 export const parseTracks = (text: string | undefined) =>
   Effect.try({
     try: () => {
@@ -124,6 +144,7 @@ export const parseTracks = (text: string | undefined) =>
     catch: (e) => new GeminiParseError(e instanceof Error ? e.message : String(e)),
   })
 
+/** 재시도할 만한 실패인지 판정한다. 429·500·502·503·504만 재시도하고 파싱 오류나 그 밖의 4xx는 즉시 포기. */
 export const isRetryable = (err: GeminiError): boolean =>
   err._tag === 'GeminiApiError' &&
   typeof err.status === 'number' &&
@@ -160,6 +181,11 @@ const generateTracksEffect = (articles: ArticleRow[], onProgress?: GeminiProgres
     return tracks
   })
 
+/**
+ * 기사들을 50건씩 나눠 Gemini에 보내고 트랙 후보를 모아 돌려준다.
+ * 배치는 순차 실행이며, 배치별 실패는 최대 5회까지 지수 백오프로 재시도한다.
+ * @param onProgress 배치 시작마다 호출되는 진행 콜백
+ */
 export function generateTracks(
   articles: ArticleRow[],
   onProgress?: GeminiProgressCallback,

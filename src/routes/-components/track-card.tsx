@@ -1,5 +1,6 @@
 import { useState } from 'react'
 
+/** 카드가 그리는 트랙 1건. `videoId`가 `null`이면 매칭에 실패한 것. */
 export interface Track {
   searchQuery: string
   videoId: string | null
@@ -10,6 +11,10 @@ interface TrackCardProps {
   track: Track
 }
 
+/**
+ * 트랙 썸네일 카드. 클릭하면 그 자리에서 iframe 플레이어로 바뀌고 그리드 전체 폭을 차지한다.
+ * 매칭된 영상이 없으면 YouTube 검색 링크로 대체한다.
+ */
 export function TrackCard({ track }: TrackCardProps) {
   const [playing, setPlaying] = useState(false)
 

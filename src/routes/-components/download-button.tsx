@@ -15,6 +15,10 @@ interface DownloadButtonProps {
   showLabel?: boolean
 }
 
+/**
+ * 서버에서 yt-dlp를 실행해 영상을 내려받는 버튼. 진행/성공/실패 상태를 아이콘으로 표시한다.
+ * @param showLabel 아이콘 옆에 텍스트 라벨도 함께 보일지 여부
+ */
 export function DownloadButton({ videoId, className, showLabel }: DownloadButtonProps) {
   const mutation = useMutation({
     mutationFn: async (id: string) => {

@@ -14,11 +14,13 @@ import { fetchFeeds } from './rss.js'
 import { appendScrapeLog, newestPublished } from './scrape-log.js'
 import { searchYouTube } from './youtube.js'
 
+/** {@link TrackInput}에 YouTube 매칭 결과를 붙인 최종 트랙. 매칭 실패 시 두 필드 모두 `null`. */
 export interface TrackWithVideo extends TrackInput {
   videoId: string | null
   videoTitle: string | null
 }
 
+/** 실행 1회의 집계 수치. 실행 로그(`scrape.jsonl`)와 UI 결과 패널이 함께 쓴다. */
 export interface PipelineStats {
   feeds: number
   feedErrors: number
@@ -30,15 +32,18 @@ export interface PipelineStats {
   processed: number
 }
 
+/** {@link runPipeline}이 generator의 return 값으로 넘기는 최종 결과. */
 export interface PipelineResult {
   tracks: TrackWithVideo[]
   stats: PipelineStats
 }
 
+/** 실행 중 스트리밍되는 진행 이벤트. `log`는 개별 메시지, `stage`는 단계 전환. */
 export type PipelineEvent =
   | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string }
   | { type: 'stage'; stage: PipelineStage; message: string }
 
+/** 파이프라인 단계 식별자. 진행 순서대로 나열돼 있다. */
 export type PipelineStage = 'feeds' | 'fetch' | 'gemini' | 'youtube' | 'mark-processed' | 'done'
 
 function log(message: string, level: 'info' | 'warn' | 'error' = 'info'): PipelineEvent {
@@ -53,7 +58,12 @@ function stage(s: PipelineStage, message: string): PipelineEvent {
  * 진행 이벤트는 yield, 최종 결과(tracks)는 return으로 전달한다.
  *
  * read 상태는 사용자 액션 전용이므로 pipeline은 건드리지 않는다.
- * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다. */
+ * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다.
+ *
+ * @yields {@link PipelineEvent} 단계 전환과 로그 메시지
+ * @returns 매칭된 트랙 목록과 집계 수치
+ * @throws {Error} 등록된 피드가 없거나 Gemini·DB 단계가 실패했을 때.
+ *   개별 피드 fetch 실패와 개별 트랙의 YouTube 검색 실패는 경고 로그로 흡수된다. */
 export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResult> {
   const startedAt = Date.now()
   const runId = new Date(startedAt).toISOString()
