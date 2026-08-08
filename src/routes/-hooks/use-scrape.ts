@@ -17,9 +17,10 @@ type StreamMessage =
 
 const runScrape = createServerFn({ method: 'POST' }).handler(async () => {
   const { runPipeline } = await import('#/server/pipeline')
+  const { livePorts } = await import('#/server/scrape-ports.live')
   return new ReadableStream<StreamMessage>({
     async start(controller) {
-      const generator = runPipeline()
+      const generator = runPipeline(livePorts)
       try {
         while (true) {
           const { value, done } = await generator.next()

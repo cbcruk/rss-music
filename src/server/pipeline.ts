@@ -1,18 +1,6 @@
-import {
-  cacheVideo,
-  getExistingArticleIds,
-  getTrackCache,
-  getUnprocessedArticles,
-  listFeeds,
-  markArticlesProcessed,
-  saveArticles,
-  touchFeed,
-  upsertFeed,
-} from './db.js'
-import { generateTracks, type TrackInput } from './gemini.js'
-import { fetchFeeds } from './rss.js'
-import { appendScrapeLog, newestPublished } from './scrape-log.js'
-import { searchYouTube } from './youtube.js'
+import type { TrackInput } from './gemini.js'
+import { newestPublished } from './scrape-log.js'
+import type { ScrapePorts } from './scrape-ports.js'
 
 /** {@link TrackInput}에 YouTube 매칭 결과를 붙인 최종 트랙. 매칭 실패 시 두 필드 모두 `null`. */
 export interface TrackWithVideo extends TrackInput {
@@ -60,11 +48,18 @@ function stage(s: PipelineStage, message: string): PipelineEvent {
  * read 상태는 사용자 액션 전용이므로 pipeline은 건드리지 않는다.
  * 재처리 방지는 processed 컬럼으로만 관리: YouTube 단계가 완료되기 전에 실패하면 processed=0으로 남아 다음 실행에서 재시도된다.
  *
+ * 바깥 세계에 닿는 일은 전부 {@link ScrapePorts}를 거친다. 결정(신규 Article 판별,
+ * 캐시를 쓸지 검색할지, 실패 흡수, 집계)은 이 함수에 남아 있으므로, 테스트가 port를
+ * in-memory adapter로 갈아끼워도 검증하려는 로직은 그대로 실행된다.
+ *
+ * @param ports 실제 실행은 `livePorts`, 테스트는 in-memory adapter
  * @yields {@link PipelineEvent} 단계 전환과 로그 메시지
  * @returns 매칭된 트랙 목록과 집계 수치
  * @throws {Error} 등록된 피드가 없거나 Gemini·DB 단계가 실패했을 때.
  *   개별 피드 fetch 실패와 개별 트랙의 YouTube 검색 실패는 경고 로그로 흡수된다. */
-export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResult> {
+export async function* runPipeline(
+  ports: ScrapePorts,
+): AsyncGenerator<PipelineEvent, PipelineResult> {
   const startedAt = Date.now()
   const runId = new Date(startedAt).toISOString()
   const stats: PipelineStats = {
@@ -79,7 +74,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
   }
 
   const logRun = (): Promise<void> =>
-    appendScrapeLog({
+    ports.log({
       type: 'run',
       runId,
       durationMs: Date.now() - startedAt,
@@ -94,7 +89,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 1: feeds
   yield stage('feeds', 'Loading feeds...')
-  const feeds = await listFeeds()
+  const feeds = await ports.listFeeds()
   if (feeds.length === 0) {
     throw new Error('No feeds registered.')
   }
@@ -103,13 +98,13 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 2: RSS fetch + save new articles as read=0, processed=0
   yield stage('fetch', `Fetching ${feeds.length} feeds...`)
-  const fetchResults = await fetchFeeds(feeds.map((f) => f.url))
+  const fetchResults = await ports.fetchFeeds(feeds.map((f) => f.url))
 
   for (const result of fetchResults) {
     if (result.error) {
       yield log(`✗ ${result.feedUrl}: ${result.error}`, 'warn')
       stats.feedErrors++
-      await appendScrapeLog({
+      await ports.log({
         type: 'feed',
         runId,
         feedUrl: result.feedUrl,
@@ -122,15 +117,12 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
       })
       continue
     }
-    if (result.feedTitle) {
-      await upsertFeed(result.feedUrl, result.feedTitle)
-    }
-    await touchFeed(result.feedUrl)
+    await ports.recordFeed(result.feedUrl, result.feedTitle)
 
-    const existing = await getExistingArticleIds(result.items.map((i) => i.id))
+    const existing = await ports.findKnownArticleIds(result.items.map((i) => i.id))
     const fresh = result.items.filter((i) => !existing.has(i.id))
     if (fresh.length > 0) {
-      await saveArticles(
+      await ports.saveArticles(
         fresh.map((i) => ({
           id: i.id,
           feedUrl: i.feedUrl,
@@ -148,7 +140,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
       stats.newArticles += fresh.length
     }
 
-    await appendScrapeLog({
+    await ports.log({
       type: 'feed',
       runId,
       feedUrl: result.feedUrl,
@@ -164,7 +156,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
     `RSS: ${fetchResults.length} feeds (${stats.feedErrors} errors), ${stats.newArticles} new articles.`,
   )
 
-  const queue = await getUnprocessedArticles()
+  const queue = await ports.takeUnprocessed()
   if (queue.length === 0) {
     await logRun()
     yield stage('done', 'No unprocessed articles.')
@@ -173,7 +165,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 3: Gemini
   yield stage('gemini', `Generating queries for ${queue.length} articles...`)
-  const tracks = await generateTracks(queue, (event) => {
+  const tracks = await ports.extractTracks(queue, (event) => {
     if (event.type === 'batch-start') {
       stats.geminiBatches = event.current
     }
@@ -184,7 +176,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
   // Stage 4: YouTube — batch-load cache once, then per-track lookup/fetch
   yield stage('youtube', `Searching YouTube for ${tracks.length} tracks...`)
   const trackArticleIds = [...new Set(tracks.map((t) => t.articleId))]
-  const cache = await getTrackCache(trackArticleIds)
+  const cache = await ports.loadMatchCache(trackArticleIds)
   const trackResults: TrackWithVideo[] = []
 
   for (const track of tracks) {
@@ -201,9 +193,9 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
     }
 
     try {
-      const video = await searchYouTube(track.searchQuery)
-      await cacheVideo(track.articleId, track.searchQuery, video.videoId, video.videoTitle)
-      trackResults.push({ ...track, ...video })
+      const match = await ports.searchMatch(track.searchQuery)
+      await ports.saveMatch(track.articleId, track.searchQuery, match)
+      trackResults.push({ ...track, ...match })
       stats.youtubeApiCalls++
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -218,7 +210,7 @@ export async function* runPipeline(): AsyncGenerator<PipelineEvent, PipelineResu
 
   // Stage 5: mark as processed (read는 사용자 액션 전용)
   const articleIds = [...new Set(tracks.map((t) => t.articleId))]
-  stats.processed = await markArticlesProcessed(articleIds)
+  stats.processed = await ports.markProcessed(articleIds)
   yield stage('mark-processed', `Marked ${stats.processed} articles as processed.`)
 
   await logRun()
