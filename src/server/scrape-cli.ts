@@ -1,5 +1,6 @@
 import { execFile } from 'node:child_process'
 import { runPipeline, type PipelineResult } from './pipeline.js'
+import { livePorts } from './scrape-ports.live.js'
 
 function ts(): string {
   return new Date().toISOString()
@@ -14,7 +15,7 @@ async function main(): Promise<void> {
   const started = Date.now()
   console.log(`[${ts()}] scrape: start`)
 
-  const generator = runPipeline()
+  const generator = runPipeline(livePorts)
   let result: PipelineResult | undefined
 
   while (true) {
