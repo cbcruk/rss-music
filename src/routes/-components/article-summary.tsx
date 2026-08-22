@@ -1,3 +1,4 @@
+/** 기사 목록 상단 제목 헤더. */
 export function ArticleSummary() {
   return (
     <header className="border-b pb-4 mb-4">

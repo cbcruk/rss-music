@@ -37,6 +37,7 @@ interface AppSidebarProps {
   unreadCount: number
 }
 
+/** 좌측 내비게이션 사이드바. 구독 중인 피드 목록과 안 읽은 기사 수를 보여준다. */
 export function AppSidebar({ feeds, unreadCount }: AppSidebarProps) {
   const location = useLocation()
 

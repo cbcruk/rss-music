@@ -4,6 +4,7 @@ interface PipelineResultPanelProps {
   result: ScrapeResult
 }
 
+/** 스크랩 실행 로그와 집계를 접이식 패널로 보여준다. */
 export function PipelineResultPanel({ result }: PipelineResultPanelProps) {
   return (
     <details className="mb-6 rounded-md border border-border bg-card p-3 text-sm" open>

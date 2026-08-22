@@ -216,6 +216,7 @@ function ArticleCard({ article: a }: { article: ArticleWithTracks }) {
   )
 }
 
+/** 기사 카드 목록. 카드 모양은 이미지·트랙 유무에 따라 {@link variantOf}가 정한다. */
 export function ArticleList({ articles }: ArticleListProps) {
   return (
     <div className="flex flex-col gap-4">

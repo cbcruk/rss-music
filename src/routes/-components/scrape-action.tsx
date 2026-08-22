@@ -8,6 +8,7 @@ interface ScrapeActionProps {
   onRun: () => void
 }
 
+/** 스크랩 실행 버튼. 상태는 직접 갖지 않고 `useScrape` 결과를 props로 받는다. */
 export function ScrapeAction({ isPending, error, onRun }: ScrapeActionProps) {
   const label = isPending ? 'Scraping…' : error ? `Failed: ${error}` : 'Run scrape'
 
