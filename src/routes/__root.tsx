@@ -5,6 +5,7 @@ import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 import { createServerFn } from '@tanstack/react-start'
 import { SidebarInset, SidebarProvider } from '#/ui/sidebar'
+import { ToastProvider, Toaster } from '#/ui/toast'
 import { TooltipProvider } from '#/ui/tooltip'
 import { AppSidebar } from './-components/app-sidebar/app-sidebar'
 import appCss from '../styles.css?url'
@@ -50,14 +51,17 @@ export const Route = createRootRouteWithContext<RouterContext>()({
 function AppLayout() {
   const { feeds, unreadCount } = Route.useLoaderData()
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar feeds={feeds} unreadCount={unreadCount} />
-        <SidebarInset>
-          <Outlet />
-        </SidebarInset>
-      </SidebarProvider>
-    </TooltipProvider>
+    <ToastProvider>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar feeds={feeds} unreadCount={unreadCount} />
+          <SidebarInset>
+            <Outlet />
+          </SidebarInset>
+        </SidebarProvider>
+      </TooltipProvider>
+      <Toaster />
+    </ToastProvider>
   )
 }
 

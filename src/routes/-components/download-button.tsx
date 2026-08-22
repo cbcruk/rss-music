@@ -2,6 +2,9 @@ import { useMutation } from '@tanstack/react-query'
 import { createServerFn } from '@tanstack/react-start'
 import { Check, Download, Loader2, X } from 'lucide-react'
 
+import { useToast } from '#/ui/toast'
+import { formatDownloadError } from './download-button.utils'
+
 const runDownload = createServerFn({ method: 'POST' })
   .inputValidator((videoId: string) => videoId)
   .handler(async ({ data }) => {
@@ -12,15 +15,35 @@ const runDownload = createServerFn({ method: 'POST' })
 interface DownloadButtonProps {
   videoId: string
   className: string
+  title?: string
   showLabel?: boolean
 }
 
-export function DownloadButton({ videoId, className, showLabel }: DownloadButtonProps) {
+export function DownloadButton({ videoId, className, title, showLabel }: DownloadButtonProps) {
+  const toast = useToast()
+  const subject = title ?? videoId
+
   const mutation = useMutation({
     mutationFn: async (id: string) => {
       const res = await runDownload({ data: id })
-      if (!res.ok) throw new Error(res.output || 'Download failed')
+      if (!res.ok) throw new Error(formatDownloadError(res.output))
       return res
+    },
+    onSuccess: () => {
+      toast.add({
+        type: 'success',
+        title: 'Saved to ~/Downloads',
+        description: subject,
+      })
+    },
+    onError: (error) => {
+      toast.add({
+        type: 'error',
+        priority: 'high',
+        timeout: 0,
+        title: `Download failed — ${subject}`,
+        description: error.message,
+      })
     },
   })
 
@@ -34,7 +57,7 @@ export function DownloadButton({ videoId, className, showLabel }: DownloadButton
     <Download className="size-4" />
   )
 
-  const title = mutation.isPending
+  const tooltip = mutation.isPending
     ? 'Downloading…'
     : mutation.isSuccess
       ? 'Saved to ~/Downloads'
@@ -57,8 +80,8 @@ export function DownloadButton({ videoId, className, showLabel }: DownloadButton
         e.stopPropagation()
         if (!mutation.isPending) mutation.mutate(videoId)
       }}
-      title={title}
-      aria-label={title}
+      title={tooltip}
+      aria-label={tooltip}
       className={className}
     >
       {icon}
