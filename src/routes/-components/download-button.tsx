@@ -21,11 +21,11 @@ interface DownloadButtonProps {
 
 /**
  * 서버에서 yt-dlp를 실행해 영상을 내려받는 버튼. 진행/성공/실패 상태를 아이콘으로 표시하고,
- * 같은 결과를 토스트로도 띄운다.
+ * 실패했을 때만 토스트를 띄운다.
  *
- * 토스트가 따로 필요한 이유는 이 버튼이 Popover 안에 있기 때문 — 팝오버가 닫히면 아이콘과
- * 라벨이 통째로 사라져서 실패가 조용히 묻힌다. 실패 토스트는 놓치지 않도록 자동으로 닫지 않는다.
- * @param title 토스트에 표시할 이름. 없으면 `videoId`를 그대로 쓴다
+ * 실패에 토스트가 따로 필요한 이유는 이 버튼이 Popover 안에 있기 때문 — 팝오버가 닫히면
+ * 아이콘과 라벨이 통째로 사라져서 실패가 조용히 묻힌다. 그래서 이 토스트는 자동으로 닫지 않는다.
+ * @param title 실패 토스트에 표시할 이름. 없으면 `videoId`를 그대로 쓴다
  * @param showLabel 아이콘 옆에 텍스트 라벨도 함께 보일지 여부
  */
 export function DownloadButton({ videoId, className, title, showLabel }: DownloadButtonProps) {
@@ -37,13 +37,6 @@ export function DownloadButton({ videoId, className, title, showLabel }: Downloa
       const res = await runDownload({ data: id })
       if (!res.ok) throw new Error(formatDownloadError(res.output))
       return res
-    },
-    onSuccess: () => {
-      toast.add({
-        type: 'success',
-        title: 'Saved to ~/Downloads',
-        description: subject,
-      })
     },
     onError: (error) => {
       toast.add({
