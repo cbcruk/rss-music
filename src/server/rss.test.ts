@@ -1,4 +1,4 @@
-import { Effect, Layer } from 'effect'
+import { Cause, Effect, Layer, Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import {
   fetchFeedEffect,
@@ -182,7 +182,7 @@ describe('fetchFeedEffect', () => {
     )
     expect(exit._tag).toBe('Failure')
     if (exit._tag === 'Failure') {
-      const error = exit.cause._tag === 'Fail' ? exit.cause.error : null
+      const error = Option.getOrNull(Cause.findErrorOption(exit.cause))
       expect(error?._tag).toBe('RssFetchError')
       expect(error?.feedUrl).toBe('broken')
       expect(error?.message).toBe('parse fail')

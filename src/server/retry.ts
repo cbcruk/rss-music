@@ -1,4 +1,4 @@
-import { Duration, Effect, Schedule, pipe } from 'effect'
+import { Duration, Effect, Schedule } from 'effect'
 
 interface RetryByStatusOptions<E extends Error> {
   isRetryable: (err: E) => boolean
@@ -14,10 +14,9 @@ interface RetryByStatusOptions<E extends Error> {
  * @param opts.label 경고 로그에 붙는 서비스 이름 (예: `'Gemini'`)
  * @returns `Effect.retry`에 넘길 Schedule */
 export function retryByStatus<E extends Error>(opts: RetryByStatusOptions<E>) {
-  return pipe(
-    Schedule.exponential(Duration.seconds(1)),
-    Schedule.intersect(Schedule.recurs(opts.maxAttempts - 1)),
-    Schedule.whileInput(opts.isRetryable),
-    Schedule.tapInput((err: E) => Effect.logWarning(`${opts.label} retry — ${err.message}`)),
+  return Schedule.exponential(Duration.seconds(1)).pipe(
+    Schedule.setInputType<E>(),
+    Schedule.while(({ input, attempt }) => attempt < opts.maxAttempts && opts.isRetryable(input)),
+    Schedule.tap(({ input }) => Effect.logWarning(`${opts.label} retry — ${input.message}`)),
   )
 }

@@ -50,10 +50,9 @@ const RESPONSE_SCHEMA = {
  * Gemini SDK 인스턴스를 담는 서비스. 테스트에서는 가짜 `ai` 객체를 주입한다.
  * @see {@link GeminiClientLive} 환경변수로 초기화하는 구현
  */
-export class GeminiClient extends Context.Tag('GeminiClient')<
-  GeminiClient,
-  { readonly ai: GoogleGenAI }
->() {}
+export class GeminiClient extends Context.Service<GeminiClient, { readonly ai: GoogleGenAI }>()(
+  'GeminiClient',
+) {}
 
 /** `GEMINI_API_KEY` 환경변수가 없을 때 Layer 구성 단계에서 실패한다. */
 export class MissingGeminiApiKeyError extends Error {

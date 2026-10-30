@@ -9,12 +9,12 @@ export class FetcherError extends Error {
  * HTTP 요청을 추상화한 서비스. 테스트에서 네트워크 없이 응답을 가짜로 주입하기 위해 존재한다.
  * @see {@link FetcherLive} `globalThis.fetch` 구현
  */
-export class Fetcher extends Context.Tag('Fetcher')<
+export class Fetcher extends Context.Service<
   Fetcher,
   {
     readonly fetch: (input: string, init?: RequestInit) => Effect.Effect<Response, FetcherError>
   }
->() {}
+>()('Fetcher') {}
 
 /** `globalThis.fetch` 기반 {@link Fetcher} 구현. */
 export const FetcherLive = Layer.succeed(Fetcher, {

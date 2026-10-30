@@ -1,4 +1,4 @@
-import { Effect, Exit } from 'effect'
+import { Cause, Effect, Exit, Option } from 'effect'
 import { describe, expect, it } from 'vitest'
 import type { ArticleRow } from './db.js'
 import {
@@ -84,9 +84,10 @@ describe('parseTracks', () => {
   it('fails with GeminiParseError on invalid JSON', () => {
     const exit = Effect.runSyncExit(parseTracks('{not valid json'))
     expect(Exit.isFailure(exit)).toBe(true)
-    if (Exit.isFailure(exit) && exit.cause._tag === 'Fail') {
-      expect(exit.cause.error).toBeInstanceOf(GeminiParseError)
-      expect((exit.cause.error as GeminiParseError)._tag).toBe('GeminiParseError')
+    if (Exit.isFailure(exit)) {
+      const error = Option.getOrNull(Cause.findErrorOption(exit.cause))
+      expect(error).toBeInstanceOf(GeminiParseError)
+      expect((error as GeminiParseError)._tag).toBe('GeminiParseError')
     }
   })
 })

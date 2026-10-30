@@ -7,17 +7,17 @@
 
 ## 가져온 스킬
 
-| 스킬                            | 쓰는 상황                               | 이 프로젝트와의 접점                                                                  |
-| ------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------- |
-| `tdd`                           | 기능 추가·버그 수정을 테스트 먼저 할 때 | vitest 스위트가 이미 있음. 서버 모듈이 대부분 순수 함수라 seam이 뚜렷함               |
-| `codebase-design`               | 모듈 인터페이스를 설계·정리할 때        | Effect `Context.Tag`로 `Fetcher`/`RssParser`/`GeminiClient`를 이미 seam으로 분리해 둠 |
-| `diagnosing-bugs`               | 원인이 안 보이는 버그, 성능 저하        | RSS·Gemini·YouTube 외부 연동이 많아 재현 루프부터 세우는 방식이 잘 맞음               |
-| `resolving-merge-conflicts`     | 머지/리베이스 충돌 해결                 | main이 선형 히스토리라 squash 머지 후 충돌이 종종 생김                                |
-| `domain-modeling`               | 도메인 용어를 확정하거나 ADR을 남길 때  | `read`(사용자 액션) vs `processed`(파이프라인)처럼 헷갈리기 쉬운 용어가 실재함        |
-| `grilling`                      | 계획·결정을 밀어붙여 검증할 때          | 실제 알맹이. 아래 두 진입점이 이걸 호출함. 모델이 알아서 부르기도 함                  |
-| `grill-me`                      | 그냥 계획만 다듬고 싶을 때              | `/grilling` 실행이 전부인 한 줄 스킬                                                  |
-| `grill-with-docs`               | 다듬으면서 용어·결정을 문서로 남길 때   | `/grilling` + `/domain-modeling`. 짝이 되는 `domain-modeling`이 여기 있어 바로 맞물림 |
-| `improve-codebase-architecture` | 리팩터링할 곳을 찾고 싶을 때            | 위 스킬 넷을 엮는 상위 워크플로. 최근 커밋이 몰린 곳부터 훑음                         |
+| 스킬                            | 쓰는 상황                               | 이 프로젝트와의 접점                                                                      |
+| ------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `tdd`                           | 기능 추가·버그 수정을 테스트 먼저 할 때 | vitest 스위트가 이미 있음. 서버 모듈이 대부분 순수 함수라 seam이 뚜렷함                   |
+| `codebase-design`               | 모듈 인터페이스를 설계·정리할 때        | Effect `Context.Service`로 `Fetcher`/`RssParser`/`GeminiClient`를 이미 seam으로 분리해 둠 |
+| `diagnosing-bugs`               | 원인이 안 보이는 버그, 성능 저하        | RSS·Gemini·YouTube 외부 연동이 많아 재현 루프부터 세우는 방식이 잘 맞음                   |
+| `resolving-merge-conflicts`     | 머지/리베이스 충돌 해결                 | main이 선형 히스토리라 squash 머지 후 충돌이 종종 생김                                    |
+| `domain-modeling`               | 도메인 용어를 확정하거나 ADR을 남길 때  | `read`(사용자 액션) vs `processed`(파이프라인)처럼 헷갈리기 쉬운 용어가 실재함            |
+| `grilling`                      | 계획·결정을 밀어붙여 검증할 때          | 실제 알맹이. 아래 두 진입점이 이걸 호출함. 모델이 알아서 부르기도 함                      |
+| `grill-me`                      | 그냥 계획만 다듬고 싶을 때              | `/grilling` 실행이 전부인 한 줄 스킬                                                      |
+| `grill-with-docs`               | 다듬으면서 용어·결정을 문서로 남길 때   | `/grilling` + `/domain-modeling`. 짝이 되는 `domain-modeling`이 여기 있어 바로 맞물림     |
+| `improve-codebase-architecture` | 리팩터링할 곳을 찾고 싶을 때            | 위 스킬 넷을 엮는 상위 워크플로. 최근 커밋이 몰린 곳부터 훑음                             |
 
 `agents/openai.yaml`은 OpenAI 에이전트용 설정이라 제외했습니다.
 

@@ -42,10 +42,10 @@ export class RssParserError extends Error {
  * 피드 URL을 파싱하는 서비스. 테스트에서는 이 Tag에 가짜 파서를 주입한다.
  * @see {@link RssParserLive} 실제 rss-parser 구현
  */
-export class RssParser extends Context.Tag('RssParser')<
+export class RssParser extends Context.Service<
   RssParser,
   { readonly parseURL: (url: string) => Effect.Effect<ParsedFeed, RssParserError> }
->() {}
+>()('RssParser') {}
 
 /** rss-parser 기반 {@link RssParser} 구현. 타임아웃 15초, media/enclosure 확장 필드를 함께 파싱한다. */
 export const RssParserLive = Layer.sync(RssParser, () => {
