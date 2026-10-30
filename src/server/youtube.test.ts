@@ -1,4 +1,5 @@
-import { Duration, Effect, Layer, TestClock, TestContext } from 'effect'
+import { Duration, Effect, Fiber, Layer } from 'effect'
+import { TestClock } from 'effect/testing'
 import { describe, expect, it } from 'vitest'
 import { Fetcher, FetcherError } from './fetcher'
 import { searchYouTubeEffect, YoutubeClient } from './youtube'
@@ -43,11 +44,11 @@ async function runWith<A>(
   clockTicksSec: ReadonlyArray<number> = [],
 ): Promise<A> {
   const program = Effect.gen(function* () {
-    const fiber = yield* Effect.fork(effect)
+    const fiber = yield* Effect.forkChild(effect)
     for (const sec of clockTicksSec) {
       yield* TestClock.adjust(Duration.seconds(sec))
     }
-    return yield* fiber.await
+    return yield* Fiber.await(fiber)
   }).pipe(
     Effect.flatMap((exit) =>
       exit._tag === 'Success' ? Effect.succeed(exit.value) : Effect.failCause(exit.cause),
@@ -57,7 +58,7 @@ async function runWith<A>(
     program.pipe(
       Effect.provide(TestYoutubeClient),
       Effect.provide(fetcher),
-      Effect.provide(TestContext.TestContext),
+      Effect.provide(TestClock.layer()),
     ),
   )
 }

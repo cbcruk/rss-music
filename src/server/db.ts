@@ -1,8 +1,8 @@
-import { SqlClient } from '@effect/sql'
 import { SqliteClient } from '@effect/sql-sqlite-node'
-import * as SqliteDrizzle from '@effect/sql-drizzle/Sqlite'
 import { and, desc, eq, inArray, sql } from 'drizzle-orm'
-import { Effect, Layer, ManagedRuntime } from 'effect'
+import * as SqliteDrizzle from 'drizzle-orm/effect-sqlite-node'
+import { Context, Effect, Layer, ManagedRuntime } from 'effect'
+import { SqlClient } from 'effect/sql'
 import { join } from 'path'
 import { articles, feeds, youtubeCache } from './schema.js'
 
@@ -77,12 +77,16 @@ const migrate = Effect.gen(function* () {
   }
 })
 
+class Drizzle extends Context.Service<Drizzle, SqliteDrizzle.EffectSQLiteNodeDatabase>()(
+  'Drizzle',
+) {}
+
 const dbLayer = (filename: string) =>
   Layer.effect(
-    SqliteDrizzle.SqliteDrizzle,
+    Drizzle,
     Effect.gen(function* () {
       yield* migrate
-      return yield* SqliteDrizzle.make()
+      return yield* SqliteDrizzle.makeWithDefaults()
     }),
   ).pipe(Layer.provide(SqliteClient.layer({ filename })))
 
@@ -179,7 +183,7 @@ function readWhere(filter: ReadFilter) {
  * 부를 일은 테스트뿐이다.
  *
  * @param filename SQLite 파일 경로. `':memory:'`면 프로세스 메모리 안에서만 산다
- * @see `docs/adr/0003-db-factory-not-context-tag.md` 다른 외부 의존과 달리 Context.Tag가 아닌 이유
+ * @see `docs/adr/0003-db-factory-not-context-tag.md` 다른 외부 의존과 달리 Context.Service가 아닌 이유
  */
 export function makeDb(filename: string) {
   const runtime = ManagedRuntime.make(dbLayer(filename))
@@ -189,7 +193,7 @@ export function makeDb(filename: string) {
     listFeeds(): Promise<FeedRow[]> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           return yield* db
             .select({
               url: feeds.url,
@@ -209,7 +213,7 @@ export function makeDb(filename: string) {
     upsertFeed(url: string, title: string | null): Promise<void> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           yield* db
             .insert(feeds)
             .values({ url, title })
@@ -225,7 +229,7 @@ export function makeDb(filename: string) {
     touchFeed(url: string): Promise<void> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           yield* db
             .update(feeds)
             .set({ lastFetchedAt: sql`datetime('now')` })
@@ -242,7 +246,7 @@ export function makeDb(filename: string) {
       if (ids.length === 0) return Promise.resolve(new Set())
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const rows = yield* db
             .select({ id: articles.id })
             .from(articles)
@@ -260,7 +264,7 @@ export function makeDb(filename: string) {
       if (rows.length === 0) return Promise.resolve()
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const values = rows.map((a) => ({
             id: a.id,
             feedUrl: a.feedUrl,
@@ -286,7 +290,7 @@ export function makeDb(filename: string) {
     markAllRead(): Promise<number> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const before = yield* db
             .select({ count: sql<number>`COUNT(*)` })
             .from(articles)
@@ -304,7 +308,7 @@ export function makeDb(filename: string) {
     getUnprocessedArticles(): Promise<ArticleRow[]> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const rows = yield* db
             .select(ARTICLE_COLUMNS)
             .from(articles)
@@ -323,7 +327,7 @@ export function makeDb(filename: string) {
       if (ids.length === 0) return Promise.resolve(0)
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const before = yield* db
             .select({ count: sql<number>`COUNT(*)` })
             .from(articles)
@@ -359,7 +363,7 @@ export function makeDb(filename: string) {
 
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const rows = yield* db
             .select({ ...ARTICLE_COLUMNS, tracksJson })
             .from(articles)
@@ -390,7 +394,7 @@ export function makeDb(filename: string) {
       const where = readWhere(readFilter)
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const rows = yield* db
             .select({ count: sql<number>`COUNT(*)` })
             .from(articles)
@@ -405,7 +409,7 @@ export function makeDb(filename: string) {
       if (articleIds.length === 0) return Promise.resolve(new Map())
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           const rows = yield* db
             .select({
               articleId: youtubeCache.articleId,
@@ -439,7 +443,7 @@ export function makeDb(filename: string) {
     ): Promise<void> {
       return runtime.runPromise(
         Effect.gen(function* () {
-          const db = yield* SqliteDrizzle.SqliteDrizzle
+          const db = yield* Drizzle
           yield* db
             .insert(youtubeCache)
             .values({ articleId, searchQuery, videoId, videoTitle })

@@ -5,10 +5,10 @@ RSS 피드에서 새 기사를 수집하고, Gemini로 YouTube 검색어를 만�
 - **RSS 직접 구독** → 등록된 피드를 직접 fetch (FeedBurner 같은 프록시는 멈추기 쉬워 직접 피드 권장)
 - **Gemini (gemini-3.1-flash-lite)** → 기사 제목에서 YouTube 검색어 생성
 - **YouTube Data API v3** → 영상 검색
-- **SQLite (better-sqlite3)** → 피드 / 기사 / read·processed 상태 / YouTube 결과 저장
+- **SQLite (`node:sqlite`)** → 피드 / 기사 / read·processed 상태 / YouTube 결과 저장
 - **yt-dlp** → 아이템별 영상 다운로드 (`~/Downloads`)
 
-스택: TanStack Start + React 19, Effect, Drizzle/SQLite, vite-plus(`vp`).
+스택: TanStack Start + React 19, Effect 4, Drizzle 1.0/SQLite, vite-plus(`vp`).
 
 ---
 
@@ -46,7 +46,7 @@ GEMINI_API_KEY=your_gemini_api_key
 | `pnpm start`        | 빌드된 웹앱 서빙 (`vp preview --port 3333`)   |
 | `pnpm scrape`       | 스크랩 1회 수동 실행 (`dist/scrape.mjs`)      |
 
-> 런타임은 vite-plus의 node(`/Users/ieunsu/.vite-plus/bin/{node,vp}`)를 씁니다. better-sqlite3가 이 ABI로 빌드돼 있어, 일반 Homebrew node로 스크랩/서버를 직접 돌리면 ABI 에러가 납니다.
+> 런타임은 vite-plus의 node(`/Users/ieunsu/.vite-plus/bin/{node,vp}`)를 씁니다. SQLite는 Node 내장 `node:sqlite`라 네이티브 빌드가 없고, Node 22.16 이상이면 어느 node로 돌려도 됩니다.
 
 ---
 

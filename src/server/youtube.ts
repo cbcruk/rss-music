@@ -10,10 +10,9 @@ const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504])
  * YouTube Data API 키를 담는 서비스. 테스트에서는 더미 키를 주입한다.
  * @see {@link YoutubeClientLive} 환경변수로 초기화하는 구현
  */
-export class YoutubeClient extends Context.Tag('YoutubeClient')<
-  YoutubeClient,
-  { readonly apiKey: string }
->() {}
+export class YoutubeClient extends Context.Service<YoutubeClient, { readonly apiKey: string }>()(
+  'YoutubeClient',
+) {}
 
 /** `YOUTUBE_API_KEY` 환경변수가 없을 때 Layer 구성 단계에서 실패한다. */
 export class MissingYoutubeApiKeyError extends Error {

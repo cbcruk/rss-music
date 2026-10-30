@@ -20,7 +20,7 @@ describe('retryByStatus — edge cases', () => {
       return Effect.fail(new TestError('boom'))
     })
 
-    await Effect.runPromise(effect.pipe(Effect.retry(policy), Effect.either))
+    await Effect.runPromise(effect.pipe(Effect.retry(policy), Effect.result))
 
     expect(attempts).toBe(1)
   })
