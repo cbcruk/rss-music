@@ -6,7 +6,13 @@
 # <swiftbar.hideAbout>true</swiftbar.hideAbout>
 # <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
 
-PROJECT="/Users/ieunsu/Documents/GitHub/rss-extensions"
+# 플러그인 폴더에 심볼릭 링크로 걸려 있어도 원본 위치(repo/swiftbar)에서 프로젝트 경로를 계산한다.
+SELF="$0"
+while [ -L "$SELF" ]; do
+  LINK="$(/usr/bin/readlink "$SELF")"
+  case "$LINK" in /*) SELF="$LINK" ;; *) SELF="$(/usr/bin/dirname "$SELF")/$LINK" ;; esac
+done
+PROJECT="${RSS_MUSIC_PROJECT:-$(cd "$(/usr/bin/dirname "$SELF")/.." && pwd)}"
 DB="$PROJECT/data/cache.db"
 SCRAPE_LOG="$HOME/Library/Logs/rss-music/scrape.log"
 URL="http://localhost:3333"

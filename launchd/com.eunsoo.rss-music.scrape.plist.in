@@ -5,16 +5,16 @@
   <key>Label</key><string>com.eunsoo.rss-music.scrape</string>
   <key>ProgramArguments</key>
   <array>
-    <string>/Users/ieunsu/.vite-plus/bin/node</string>
+    <string>__NODE__</string>
     <string>--env-file=.env</string>
     <string>dist/scrape.mjs</string>
   </array>
-  <key>WorkingDirectory</key><string>/Users/ieunsu/Documents/GitHub/rss-extensions</string>
+  <key>WorkingDirectory</key><string>__PROJECT__</string>
   <key>EnvironmentVariables</key>
-  <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/bin:/bin</string></dict>
+  <dict><key>PATH</key><string>__NODE_DIR__:/opt/homebrew/bin:/usr/bin:/bin</string></dict>
   <key>RunAtLoad</key><true/>
   <key>StartInterval</key><integer>7200</integer>
-  <key>StandardOutPath</key><string>/Users/ieunsu/Library/Logs/rss-music/scrape.log</string>
-  <key>StandardErrorPath</key><string>/Users/ieunsu/Library/Logs/rss-music/scrape.log</string>
+  <key>StandardOutPath</key><string>__HOME__/Library/Logs/rss-music/scrape.log</string>
+  <key>StandardErrorPath</key><string>__HOME__/Library/Logs/rss-music/scrape.log</string>
 </dict>
 </plist>
