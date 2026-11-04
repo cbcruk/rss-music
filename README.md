@@ -46,7 +46,7 @@ GEMINI_API_KEY=your_gemini_api_key
 | `pnpm start`        | 빌드된 웹앱 서빙 (`vp preview --port 3333`)   |
 | `pnpm scrape`       | 스크랩 1회 수동 실행 (`dist/scrape.mjs`)      |
 
-> 런타임은 vite-plus의 node(`/Users/ieunsu/.vite-plus/bin/{node,vp}`)를 씁니다. SQLite는 Node 내장 `node:sqlite`라 네이티브 빌드가 없고, Node 22.16 이상이면 어느 node로 돌려도 됩니다.
+> 런타임은 `launchd/install.sh` 실행 시점의 `node`(`command -v node`)를 씁니다. SQLite는 Node 내장 `node:sqlite`라 네이티브 빌드가 없고, Node 22.16 이상이면 어느 node로 돌려도 됩니다.
 
 ---
 
@@ -59,17 +59,19 @@ GEMINI_API_KEY=your_gemini_api_key
 | `com.eunsoo.rss-music.server` | `vp preview --port 3333` keepalive — 웹 UI + 서버 함수(스크랩 버튼, yt-dlp 다운로드) |
 | `com.eunsoo.rss-music.scrape` | 로그인 시 + **2시간마다**(StartInterval) 스크랩, 새 글 있으면 알림(osascript)        |
 
-plist 원본은 `launchd/`에 버전관리되어 있습니다.
+plist는 `launchd/*.plist.in` 템플릿으로 버전관리됩니다. 경로(프로젝트 위치·`$HOME`·node)는 설치 스크립트가 이 머신에 맞게 채워 넣습니다.
 
 ### 설치
 
 ```bash
-cp launchd/*.plist ~/Library/LaunchAgents/
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eunsoo.rss-music.server.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.eunsoo.rss-music.scrape.plist
+pnpm install
+pnpm build && pnpm build:scrape
+launchd/install.sh              # ~/Library/LaunchAgents에 렌더링 + bootstrap (+ SwiftBar 링크)
 ```
 
-> ⚠️ plist에 `/Users/ieunsu/...` 절대경로가 박혀 있습니다. 다른 머신/경로면 plist의 `ProgramArguments`·`WorkingDirectory`를 수정하세요. 사전에 `pnpm build && pnpm build:scrape`로 `dist/`가 준비돼 있어야 합니다.
+> 사용자명, 프로젝트 위치, node 버전(nvm)이 바뀌면 `launchd/install.sh`만 다시 실행하세요. node는 `command -v node`로 찾고, `NODE=/path/to/node launchd/install.sh`로 직접 지정할 수 있습니다. 제거는 `launchd/install.sh --uninstall`.
+>
+> agent는 셸 래퍼(`node_modules/.bin/vp`) 대신 node를 직접 실행합니다. launchd에서 `/bin/sh`는 `~/Documents` 접근이 막혀(TCC) `Operation not permitted`로 실패하기 때문입니다.
 
 ### 관리
 
@@ -95,7 +97,7 @@ defaults write com.ameba.SwiftBar PluginDirectory -string "$PWD/swiftbar"
 open -a SwiftBar
 ```
 
-> SwiftBar가 플러그인 폴더 접근을 물으면 repo의 `swiftbar/`를 선택하세요. plugin은 `launchctl`/`sqlite3`/`curl`을 호출하므로 절대경로가 박혀 있습니다(다른 머신이면 `swiftbar/rss-music.1m.sh` 상단 변수 수정).
+> 이미 다른 플러그인 폴더를 쓰고 있다면 `launchd/install.sh`가 그 폴더에 `rss-music.1m.sh` 심볼릭 링크를 만듭니다. 플러그인은 자기 위치(링크 원본)에서 프로젝트 경로를 계산하므로 경로를 수정할 필요가 없습니다(`RSS_MUSIC_PROJECT`로 덮어쓰기 가능).
 
 ---
 
